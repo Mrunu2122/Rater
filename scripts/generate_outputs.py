@@ -1,7 +1,6 @@
 import os
 import sys
 
-# Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import json
@@ -39,7 +38,6 @@ async def run_live_extraction():
     extractor = GeminiFactExtractor()
     if not extractor.api_key:
         print("ERROR: GEMINI_API_KEY is not configured in rater/.env.", file=sys.stderr)
-        print("Cannot run live extraction without an active key.", file=sys.stderr)
         sys.exit(1)
         
     print(f"Running live extraction with model: {extractor.model}...")
@@ -49,25 +47,32 @@ async def run_live_extraction():
         with open(pdf_path, "rb") as f:
             pdf_bytes = f.read()
             
-        extraction = await extractor.extract_facts(pdf_bytes, os.path.basename(pdf_path))
-        facts: PolicyFacts = extraction["facts"]
-        grid = registry.get_grid(item["insurer_slug"])
-        resolution = resolve_policy(facts, grid)
+        try:
+            extraction = await extractor.extract_facts(pdf_bytes, os.path.basename(pdf_path))
+            facts: PolicyFacts = extraction["facts"]
+            grid = registry.get_grid(item["insurer_slug"])
+            resolution = resolve_policy(facts, grid)
+            
+            output_data = {
+                "id": f"live-{item['insurer_slug']}",
+                "fileName": os.path.basename(pdf_path),
+                "status": resolution.status.value,
+                "rates": {k: v.model_dump() for k, v in resolution.rates.items()},
+                "confidence": resolution.confidence,
+                "facts": facts.model_dump(),
+                "trace": [t.model_dump() for t in resolution.trace]
+            }
+            
+            out_path = os.path.join(os.path.dirname(__file__), "..", item["output_file"])
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(output_data, f, indent=2)
+            print(f"Wrote live output to {item['output_file']} (Status: {resolution.status.value})")
+        except Exception as e:
+            print(f"Live extraction failed for {item['insurer_slug']}: {e}", file=sys.stderr)
+            print("Keeping verified benchmark output in place.")
         
-        output_data = {
-            "id": f"live-{item['insurer_slug']}",
-            "fileName": os.path.basename(pdf_path),
-            "status": resolution.status.value,
-            "rates": {k: v.model_dump() for k, v in resolution.rates.items()},
-            "confidence": resolution.confidence,
-            "facts": facts.model_dump(),
-            "trace": [t.model_dump() for t in resolution.trace]
-        }
-        
-        out_path = os.path.join(os.path.dirname(__file__), "..", item["output_file"])
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(output_data, f, indent=2)
-        print(f"Wrote live output to {item['output_file']} (Status: {resolution.status.value})")
+        # Friendly delay between live API calls
+        await asyncio.sleep(4)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate benchmark outputs")
@@ -77,7 +82,6 @@ def main():
     if args.live:
         asyncio.run(run_live_extraction())
     else:
-        print("Generating outputs from golden policy facts...")
         print("Outputs already initialized from verified facts.")
 
 if __name__ == "__main__":
