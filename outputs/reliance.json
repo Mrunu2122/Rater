@@ -1,0 +1,203 @@
+{
+  "policyFile": "pvt-car-comprehensive-reliance.pdf",
+  "status": "resolved",
+  "confidence": {
+    "level": 75,
+    "reason": "Previous insurer not stated; Reliance <1000 CC 5% lesser treated as percentage points [ASSUMPTION]; Title states FEB 26 Grid, sheet header A1 states Jan-26; policy dated 2025-12-23 (warning logged)"
+  },
+  "facts": {
+    "insurer": {
+      "value": "Reliance General Insurance Company Limited",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "previousInsurer": {
+      "value": null,
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": "Previous insurer not stated on schedule",
+      "lowConfidence": true
+    },
+    "businessType": {
+      "value": "unknown",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": "Previous insurer not stated",
+      "lowConfidence": true
+    },
+    "policyType": {
+      "value": "comprehensive",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "make": {
+      "value": "RENAULT",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "model": {
+      "value": "KWID 1.0 RXT O",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "fuel": {
+      "value": "petrol",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "rto": {
+      "value": "UP-16",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "printedLocation": {
+      "value": "UTTAR PRADESH - Noida DADRI GAUTAM BUDDHA NAGAR",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "engineCc": {
+      "value": 999,
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "registrationYear": {
+      "value": 2020,
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "manufactureYear": null,
+    "vehicleAgeYears": {
+      "value": 5,
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "policyStartDate": {
+      "value": "2025-12-23",
+      "page": 2,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "premiums": {
+      "basicOd": 5064.16,
+      "ncbDiscount": 350.01,
+      "netOd": 4714.0,
+      "basicTp": 2094.0,
+      "netTp": 2519.0,
+      "taxes": 1302.0,
+      "total": 8535.0,
+      "page": 2,
+      "confidence": 1.0,
+      "ncbPercent": 25.0,
+      "ncbUnclearNote": "NCB base unclear: 25% of 5064.16 is 1266.04; 350.01 implies base 1400.04"
+    }
+  },
+  "rates": {
+    "od": {
+      "applicable": true,
+      "ratePercent": 17.5,
+      "state": "resolved",
+      "reason": "Resolved base rate 22.5% with <1000 CC footnote deduction to 17.5%",
+      "citations": [
+        {
+          "sourceType": "grid",
+          "file": "Reliance Broking Premier  FEB 26 Grid.xlsx",
+          "sheet": "PRIVATE CAR COMP, SAOD & STP",
+          "page": null,
+          "coordinate": "A11:C11",
+          "description": "Zone NORTH \u00d7 Region Delhi \u00d7 Petrol/Bifuel/Comp -> OD 22.5%"
+        },
+        {
+          "sourceType": "grid",
+          "file": "Reliance Broking Premier  FEB 26 Grid.xlsx",
+          "sheet": "PRIVATE CAR COMP, SAOD & STP",
+          "page": null,
+          "coordinate": "H3",
+          "description": "Payout for < 1000 CC, PO will be 5% lesser than the above Grid"
+        }
+      ]
+    },
+    "tp": {
+      "applicable": true,
+      "ratePercent": null,
+      "state": "unsupported",
+      "reason": "Third Party commission is not published in this grid (strictly OD-only payout per Cell H2)",
+      "citations": [
+        {
+          "sourceType": "grid",
+          "file": "Reliance Broking Premier  FEB 26 Grid.xlsx",
+          "sheet": "PRIVATE CAR COMP, SAOD & STP",
+          "page": null,
+          "coordinate": "H2",
+          "description": "payout will made on OD Premium"
+        }
+      ]
+    }
+  },
+  "trace": [
+    {
+      "step": 1,
+      "decision": "Selected grid for insurer: Reliance General Insurance Company Limited",
+      "policyCitation": "Policy p.2",
+      "gridCitation": "Reliance Broking Premier  FEB 26 Grid.xlsx (SHA: 50cd340b...)",
+      "explanation": "Matched policy insurer 'Reliance General Insurance Company Limited' to grid Reliance Broking Premier  FEB 26 Grid.xlsx."
+    },
+    {
+      "step": 2,
+      "decision": "Grid effective date caveat noted",
+      "policyCitation": "Policy start date: 2025-12-23",
+      "gridCitation": "Reliance Broking Premier  FEB 26 Grid.xlsx",
+      "explanation": "Title states FEB 26 Grid, sheet header A1 states Jan-26; policy dated 2025-12-23 (warning logged)"
+    },
+    {
+      "step": 3,
+      "decision": "Resolved geography key: Delhi",
+      "policyCitation": "Policy printed location: 'UTTAR PRADESH - NOIDA DADRI GAUTAM BUDDHA NAGAR' / RTO: 'UP-16'",
+      "gridCitation": "RTO List!A1253:E1253",
+      "explanation": "In-grid table RTO List mapped 'UP-16' to Region_City 'Delhi', Zone 'NORTH', matching grid region 'Delhi'."
+    },
+    {
+      "step": 4,
+      "decision": "Third Party commission is not published in grid",
+      "policyCitation": "pvt-car-comprehensive-reliance.pdf \u00b7 p.2",
+      "gridCitation": "PRIVATE CAR COMP, SAOD & STP!H2",
+      "explanation": "Cell H2 states 'payout will made on OD Premium'; no Third Party payout is published for Comprehensive policies."
+    },
+    {
+      "step": 5,
+      "decision": "Found base OD rate: 22.5%",
+      "policyCitation": "Policy p.2: Fuel Petrol",
+      "gridCitation": "PRIVATE CAR COMP, SAOD & STP!A11:C11",
+      "explanation": "Base rate for Region 'Delhi' under Petrol/Bifuel/Comp is 22.5%."
+    },
+    {
+      "step": 6,
+      "decision": "Applied Footnote H3 (<1000 CC engine reduction): OD = 17.5%",
+      "policyCitation": "Policy p.2: Engine CC = 999 cc",
+      "gridCitation": "PRIVATE CAR COMP, SAOD & STP!H3",
+      "explanation": "Engine capacity is 999 cc (< 1000 CC). Footnote H3 applied as percentage points deduction: 22.5% - 5.0% = 17.5% [ASSUMPTION]. Note: Multiplicative interpretation yields 21.375%."
+    }
+  ],
+  "appliedGridChecksum": "50cd340b3ea5917d4fc6d55e720c14405f26d5076c059414b69a6c03ea7b3142",
+  "resolverVersion": "1.0.0"
+}

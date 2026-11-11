@@ -1,0 +1,195 @@
+{
+  "policyFile": "pvt-car-satp-tata-aig.pdf",
+  "status": "unsupported",
+  "confidence": {
+    "level": 80,
+    "reason": "GWP volume incremental COA caveat noted [ASSUMPTION]"
+  },
+  "facts": {
+    "insurer": {
+      "value": "TATA AIG GENERAL INSURANCE COMPANY LIMITED",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "previousInsurer": {
+      "value": "TATA AIG GENERAL INSURANCE CO.LTD.",
+      "page": 11,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "businessType": {
+      "value": "renewal",
+      "page": 11,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "policyType": {
+      "value": "stand_alone_tp",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "make": {
+      "value": "MARUTI",
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "model": {
+      "value": "ZEN ESTILO / LXI CNG / HATCH BACK",
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "fuel": {
+      "value": "cng",
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "rto": {
+      "value": "DL 9C AB 2893",
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "printedLocation": {
+      "value": "New Delhi, DELHI-DELHI, 110059, DELHI, India",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "engineCc": {
+      "value": 998,
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "registrationYear": {
+      "value": 2011,
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "manufactureYear": null,
+    "vehicleAgeYears": {
+      "value": 15,
+      "page": 4,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "policyStartDate": {
+      "value": "2026-04-01",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "premiums": {
+      "basicOd": null,
+      "ncbDiscount": null,
+      "netOd": null,
+      "basicTp": 2094.0,
+      "netTp": 2154.0,
+      "taxes": 388.0,
+      "total": 2542.0,
+      "page": 5,
+      "confidence": 1.0,
+      "ncbPercent": null,
+      "ncbUnclearNote": null
+    }
+  },
+  "rates": {
+    "od": {
+      "applicable": false,
+      "ratePercent": null,
+      "state": "not_applicable",
+      "reason": "Stand-alone TP policy: Own Damage cover not applicable",
+      "citations": []
+    },
+    "tp": {
+      "applicable": true,
+      "ratePercent": null,
+      "state": "unsupported",
+      "reason": "Grid declares tabulated figure as base commission only (uncertified base: 38.0%), with final payable payout depending on external broker portfolio GWP incremental COA rules (Pvtcar!F3, General Guidelines!C5)",
+      "citations": [
+        {
+          "sourceType": "grid",
+          "file": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx",
+          "sheet": "Pvtcar",
+          "page": null,
+          "coordinate": "F3",
+          "description": "***Below COA Rates would be Base Commission processed, Additionally GWP Based Rule will be Applicable"
+        },
+        {
+          "sourceType": "grid",
+          "file": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx",
+          "sheet": "General Guidelines",
+          "page": null,
+          "coordinate": "B5:C5",
+          "description": "Only Base Commission Needs to be updated in the Following sheet, Additionally we have created GWP based Rule Incremental COA"
+        },
+        {
+          "sourceType": "grid",
+          "file": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx",
+          "sheet": "Pvtcar",
+          "page": null,
+          "coordinate": "V511:V535",
+          "description": "Candidate uncertified base rate: 38.0%"
+        }
+      ]
+    }
+  },
+  "trace": [
+    {
+      "step": 1,
+      "decision": "Selected grid for insurer: Tata AIG General Insurance Company Limited",
+      "policyCitation": "Policy p.1",
+      "gridCitation": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx (SHA: c62b657e...)",
+      "explanation": "Matched policy insurer 'TATA AIG GENERAL INSURANCE COMPANY LIMITED' to grid Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx."
+    },
+    {
+      "step": 2,
+      "decision": "Grid effective date caveat noted",
+      "policyCitation": "Policy start date: 2026-04-01",
+      "gridCitation": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx",
+      "explanation": "Pvtcar Row 1 states applicable from 1st Nov'25 policies"
+    },
+    {
+      "step": 3,
+      "decision": "Resolved geography key: DELHI",
+      "policyCitation": "Policy printed location: 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' / RTO: 'DL 9C AB 2893'",
+      "gridCitation": "Pvtcar Col V (DELHI)",
+      "explanation": "Policy printed location text 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' matched grid column label 'DELHI' directly (Rule 7 applied with exact text match)."
+    },
+    {
+      "step": 4,
+      "decision": "Inspected Tata AIG Pvtcar candidate rows for Delhi CNG SATP Renewal",
+      "policyCitation": "Policy p.1: 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' matched column DELHI",
+      "gridCitation": "Pvtcar!V511:V535",
+      "explanation": "All 7 vehicle categories (Compact, MPV SUV, Mid Size, Ultra High End, Mini, High End, Quadricycle) yield an identical base COA rate: 38.0%."
+    },
+    {
+      "step": 5,
+      "decision": "Refused final TP rate with proof: Base-only commission with pending GWP tier",
+      "policyCitation": "pvt-car-satp-tata-aig.pdf \u00b7 p.4, 5, 11",
+      "gridCitation": "Pvtcar!F3, General Guidelines!C5, Pvtcar!V511:V535",
+      "explanation": "The grid specifies that the tabulated 38.0% rate is a base commission only, and that additional GWP-based incremental COA rules apply. Because broker portfolio GWP is not present on an individual policy, the final payable rate cannot be authoritatively determined. Output refused with proof (status: unsupported)."
+    }
+  ],
+  "appliedGridChecksum": "c62b657e7d819a250cb86549c177f88ff0277835d39a2a3e0d337fdc9915f879",
+  "resolverVersion": "1.0.0"
+}

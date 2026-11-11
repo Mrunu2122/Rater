@@ -1,0 +1,181 @@
+{
+  "policyFile": "pvt-car-comprehensive-hdfc-ergo.pdf",
+  "status": "resolved",
+  "confidence": {
+    "level": 80,
+    "reason": "Fuel type not printed on policy schedule; inferred from model Mahindra Bolero Neo 1493cc; Single-policy Net OD applied for slab achievement [ASSUMPTION]"
+  },
+  "facts": {
+    "insurer": {
+      "value": "HDFC ERGO General Insurance Company Limited",
+      "page": 1,
+      "confidence": 0.99,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "previousInsurer": {
+      "value": "TATA AIG GENERAL INSURANCE CO.LTD.",
+      "page": 1,
+      "confidence": 0.95,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "businessType": {
+      "value": "rollover",
+      "page": 1,
+      "confidence": 0.95,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "policyType": {
+      "value": "comprehensive",
+      "page": 1,
+      "confidence": 0.98,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "make": {
+      "value": "MAHINDRA",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "model": {
+      "value": "BOLERO NEO-N10 (R)",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "fuel": {
+      "value": "diesel",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": "Fuel type not printed on policy schedule; inferred from model Mahindra Bolero Neo 1493cc",
+      "lowConfidence": true
+    },
+    "rto": {
+      "value": "HR-26",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "printedLocation": {
+      "value": "HARYANA 122002 GURUGRAM GURGAON",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "engineCc": {
+      "value": 1493,
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "registrationYear": {
+      "value": 2023,
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "manufactureYear": null,
+    "vehicleAgeYears": {
+      "value": 3,
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "policyStartDate": {
+      "value": "2026-03-29",
+      "page": 1,
+      "confidence": 1.0,
+      "uncertainty": null,
+      "lowConfidence": false
+    },
+    "premiums": {
+      "basicOd": 2433.0,
+      "ncbDiscount": 852.0,
+      "netOd": 8053.0,
+      "basicTp": 3416.0,
+      "netTp": 3816.0,
+      "taxes": 2136.0,
+      "total": 14005.0,
+      "page": 1,
+      "confidence": 1.0,
+      "ncbPercent": 35.0,
+      "ncbUnclearNote": null
+    }
+  },
+  "rates": {
+    "od": {
+      "applicable": true,
+      "ratePercent": 15.0,
+      "state": "resolved",
+      "reason": "Matched Zone 2 \u00d7 Package \u00d7 Non-Petrol \u00d7 NCB \u00d7 Slab <10k -> OD 15.0%",
+      "citations": [
+        {
+          "sourceType": "grid",
+          "file": "Pvt Car New Grid Eff 1st Feb'25 (HDFC ergo) 1.pdf",
+          "sheet": null,
+          "page": 1,
+          "coordinate": "Table 2 Row 5 Col 3",
+          "description": "Zone 2 \u00d7 Package \u00d7 Non-Petrol \u00d7 NCB \u00d7 Slab <10k -> OD 15.0%"
+        }
+      ]
+    },
+    "tp": {
+      "applicable": true,
+      "ratePercent": null,
+      "state": "unsupported",
+      "reason": "TP commission is not published in this schedule (Own Damage only)",
+      "citations": [
+        {
+          "sourceType": "grid",
+          "file": "Pvt Car New Grid Eff 1st Feb'25 (HDFC ergo) 1.pdf",
+          "sheet": null,
+          "page": 1,
+          "coordinate": "Table 1-2 Headers",
+          "description": "Grid publishes Package and SAOD rates on OD premium only"
+        }
+      ]
+    }
+  },
+  "trace": [
+    {
+      "step": 1,
+      "decision": "Selected grid for insurer: HDFC ERGO General Insurance Company Limited",
+      "policyCitation": "Policy p.1",
+      "gridCitation": "Pvt Car New Grid Eff 1st Feb'25 (HDFC ergo) 1.pdf (SHA: d0900bf6...)",
+      "explanation": "Matched policy insurer 'HDFC ERGO General Insurance Company Limited' to grid Pvt Car New Grid Eff 1st Feb'25 (HDFC ergo) 1.pdf."
+    },
+    {
+      "step": 2,
+      "decision": "Grid effective date caveat noted",
+      "policyCitation": "Policy start date: 2026-03-29",
+      "gridCitation": "Pvt Car New Grid Eff 1st Feb'25 (HDFC ergo) 1.pdf",
+      "explanation": "Page 1 states Effective from 1st Feb'25 (open-ended schedule)"
+    },
+    {
+      "step": 3,
+      "decision": "Resolved geography key: Zone-2",
+      "policyCitation": "Policy printed location: 'HARYANA 122002 GURUGRAM GURGAON' / RTO: 'HR-26'",
+      "gridCitation": "Page 2 Table 1 Row 3",
+      "explanation": "Policy printed location 'HARYANA 122002 GURUGRAM GURGAON' matched grid territory 'HARYANA', resolving to 'Zone-2'."
+    },
+    {
+      "step": 4,
+      "decision": "Resolved Own Damage rate: 15.0%",
+      "policyCitation": "Policy p.1: Net OD = \u20b98,053.00, NCB Discount = \u20b9852.0",
+      "gridCitation": "Page 1 Table 2 Row 5 Col 3",
+      "explanation": "Matched Zone 2, Package, Non-Petrol, NCB in slab '<10k'. Base rate is 15.0%. [ASSUMPTION: Single-policy Net OD \u20b98,053.00 applied for slab achievement; volume GWP caveat noted]."
+    }
+  ],
+  "appliedGridChecksum": "d0900bf67631151ac5a9b398402279a56e5bc75a13659de6f294a3b298712bf9",
+  "resolverVersion": "1.0.0"
+}
