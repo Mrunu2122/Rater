@@ -2,13 +2,17 @@
 
 A production-quality motor insurance commission resolver engine and web application built for the Vaatun Insurance Rater Agent Challenge. The system extracts policy facts from PDF motor policies, resolves exact OD (Own Damage) and TP (Third Party) brokerage commission rates against authoritative insurer commission grids, and provides fully auditable decision traces with cell and page citations.
 
+> [!NOTE]
+> **Extraction & Output Provenance**: The current benchmark artifacts in `outputs/` are generated from manually verified ground-truth policy facts and deterministic rater grid resolution, not live LLM extraction. To run live Gemini 3.5 extraction against the policy PDFs, configure your `GEMINI_API_KEY` in `rater/.env` and execute `python scripts/generate_outputs.py --live`.
+
 ---
 
 ## Architecture & Storage Overview
 
 ### 1. Persistence & Durability
-- **Metadata & Decision Traces**: Stored in a relational database via SQLAlchemy / asyncpg / aiosqlite. In production, this runs against **PostgreSQL** (`DATABASE_URL=postgresql+asyncpg://...`). In local development and testing, it gracefully supports SQLite with write-ahead logging.
-- **Raw Policy PDFs**: Stored in an **S3-compatible Object Store** (`STORAGE_BACKEND=s3`), targeting **AWS S3** or **Supabase Storage**. When running locally, MinIO or a persistent local disk directory fallback (`STORAGE_LOCAL_DIR`) is used. Policy files are never stored ephemerally; files are indexed with SHA-256 hashes and can be retrieved or audited at any time.
+- **Strict Production Enforcement**: When `APP_ENV=production`, the application refuses to start unless `DATABASE_URL` (PostgreSQL) and all S3 credentials (`S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET_NAME`) are properly configured. Silent local fallbacks are prohibited in production mode.
+- **Development & Testing**: Local SQLite (`data/rater.db`) and local persistent disk storage (`data/storage/`) are permitted strictly when `APP_ENV=dev` or `development`.
+- **Health Verification**: The `GET /api/health` endpoint reports the active database backend (`postgresql` vs `sqlite`) and storage backend (`s3` vs `local_disk`).
 
 ### 2. Gemini Extraction Pipeline
 - **Model**: `gemini-3.5-flash` via the official Google GenAI SDK (`google-genai` v3.0.0+).
@@ -98,6 +102,9 @@ python -m pytest backend/tests/golden/ -v
 
 # Run API & integration tests
 python -m pytest backend/tests/integration/ -v
+
+# Run resolver unit tests and parser tests
+python -m pytest backend/tests/unit/ -v
 ```
 
 ---
@@ -105,7 +112,7 @@ python -m pytest backend/tests/integration/ -v
 ## Output Benchmark Artifacts
 
 The resolved outputs for the 4 benchmark policies are generated in `outputs/`:
-- `outputs/hdfc-ergo.json`: Status `resolved` (OD: 15.0% in `<10k`, TP: 0.0% not covered).
-- `outputs/reliance.json`: Status `resolved` (OD: 17.5% with 5% lesser deduction applied, TP: not published citing H2).
-- `outputs/godigit.json`: Status `resolved` (OD: 20.0%, TP: 2.5% citing Non-CV TP).
-- `outputs/tata-aig.json`: Status `unsupported` (TP unsupported citing `Pvtcar!F3` GWP incremental doctrine; candidate base 38.0% logged with citations `Pvtcar!V511:V535`).
+- `outputs/hdfc-ergo.json`: Status `resolved` (OD: 15.0% in `<10k`, TP: `unsupported` not published).
+- `outputs/reliance.json`: Status `resolved` (OD: 17.5% with 5% lesser deduction applied, TP: `unsupported` not published citing H2).
+- `outputs/godigit.json`: Status `resolved` (OD: `not_applicable`, TP: 29.5% citing 4W SATP!B293:E293).
+- `outputs/tata-aig.json`: Status `unsupported` (OD: `not_applicable`, TP unsupported citing `Pvtcar!F3` GWP incremental doctrine; candidate base 38.0% logged with citations `Pvtcar!V511:V535`).

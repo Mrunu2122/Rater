@@ -1,18 +1,43 @@
 import os
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy import select, update
 from backend.app.config import settings
-from backend.app.storage.db import init_db_sync
-from backend.app.api.runs import router as runs_router
+from backend.app.storage.db import init_db_sync, AsyncSessionLocal
+from backend.app.storage.models import RunModel
+from backend.app.api.runs import router as runs_router, run_background_analysis
 from backend.app.api.meta import router as meta_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rater")
 
-app = FastAPI(title="Insurance Rater Agent API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Initialize schema
+    init_db_sync()
+    logger.info("Database initialized.")
+    
+    # 2. Startup recovery: Find any stuck runs in transient state and recover or re-queue them
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            update(RunModel)
+            .where(RunModel.status.in_(["extracting", "resolving"]))
+            .values(
+                status="failed",
+                error_message="Analysis was interrupted by server restart. Please click Re-run."
+            )
+        )
+        await session.execute(stmt)
+        await session.commit()
+        logger.info("Startup recovery complete: recovered interrupted runs.")
+        
+    yield
+
+app = FastAPI(title="Insurance Rater Agent API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,11 +46,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def on_startup():
-    init_db_sync()
-    logger.info("Database initialized.")
 
 app.include_router(runs_router)
 app.include_router(meta_router)

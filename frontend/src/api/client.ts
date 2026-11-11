@@ -32,7 +32,7 @@ export interface PremiumBreakup {
   taxes?: number;
   total?: number;
   page?: number;
-  confidence: number;
+  confidence?: number;
   ncbPercent?: number;
   ncbUnclearNote?: string;
 }
@@ -59,8 +59,9 @@ export interface TraceStep {
   step: number;
   decision: string;
   policyCitation?: string;
-  gridCitation?: string;
-  explanation: string;
+  gridCitation?: any;
+  explanation?: string;
+  caveats?: string[];
 }
 
 export interface RunDetail {
@@ -89,7 +90,7 @@ export interface RunDetail {
   isDuplicate?: boolean;
 }
 
-export interface RunListItem {
+export interface RunSummary {
   id: string;
   fileName: string;
   fileSizeBytes: number;
@@ -107,71 +108,52 @@ export interface RunListItem {
   };
 }
 
-export interface GridInfo {
-  insurerId: string;
-  insurerName: string;
-  fileName: string;
-  checksumSha256: string;
-  effectiveFrom?: string;
-  effectiveTo?: string;
-  effectiveDateCaveat?: string;
-  rulesCount: number;
-  footnotesCount: number;
-}
+export const api = {
+  uploadPolicy: async (file: File): Promise<{ id: string; status: string; fileName: string; isDuplicate: boolean }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const resp = await fetch('/api/runs', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Upload failed' }));
+      throw new Error(err.detail || 'Upload failed');
+    }
+    return resp.json();
+  },
 
-export interface BenchItem {
-  insurer: string;
-  policyType: string;
-  fileName: string;
-  tests: string;
-  expectedStatus: string;
-  expectedOd: string;
-  expectedTp: string;
-  citation: string;
-}
+  listRuns: async (params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<RunSummary[]> => {
+    const qs = new URLSearchParams();
+    if (params?.status && params.status !== 'all') qs.append('status', params.status);
+    if (params?.search) qs.append('search', params.search);
+    if (params?.page) qs.append('page', params.page.toString());
+    if (params?.limit) qs.append('limit', params.limit.toString());
+    const resp = await fetch(`/api/runs?${qs.toString()}`);
+    if (!resp.ok) throw new Error('Failed to fetch runs');
+    return resp.json();
+  },
 
-export async function uploadPolicyPdf(file: File): Promise<{ id: string; status: string; fileName: string; isDuplicate: boolean }> {
-  const formData = new FormData();
-  formData.append('file', file);
-  const resp = await fetch('/api/runs', {
-    method: 'POST',
-    body: formData
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: 'Upload failed' }));
-    throw new Error(err.detail || 'Upload failed');
+  getRun: async (id: string): Promise<RunDetail> => {
+    // Check if benchmark shortcut
+    if (['hdfc-ergo', 'reliance', 'godigit', 'tata-aig'].includes(id)) {
+      const resp = await fetch(`/api/bench/${id}`);
+      if (!resp.ok) throw new Error('Failed to load benchmark output');
+      return resp.json();
+    }
+    const resp = await fetch(`/api/runs/${id}`);
+    if (!resp.ok) throw new Error('Failed to fetch run detail');
+    return resp.json();
+  },
+
+  getPdfUrl: (id: string) => `/api/runs/${id}/pdf`,
+  getExportUrl: (id: string) => `/api/runs/${id}/export`,
+
+  rerunAnalysis: async (id: string): Promise<void> => {
+    const resp = await fetch(`/api/runs/${id}/rerun`, { method: 'POST' });
+    if (!resp.ok) throw new Error('Failed to re-run analysis');
+  },
+
+  getGrids: async (): Promise<{ count: number; grids: any[] }> => {
+    const resp = await fetch('/api/grids');
+    if (!resp.ok) throw new Error('Failed to fetch grids');
+    return resp.json();
   }
-  return resp.json();
-}
-
-export async function fetchRuns(status?: string, search?: string): Promise<RunListItem[]> {
-  const params = new URLSearchParams();
-  if (status && status !== 'all') params.append('status', status);
-  if (search) params.append('search', search);
-  const resp = await fetch(`/api/runs?${params.toString()}`);
-  if (!resp.ok) throw new Error('Failed to fetch runs');
-  return resp.json();
-}
-
-export async function fetchRun(id: string): Promise<RunDetail> {
-  const resp = await fetch(`/api/runs/${id}`);
-  if (!resp.ok) throw new Error('Failed to fetch run detail');
-  return resp.json();
-}
-
-export async function rerunAnalysis(id: string): Promise<void> {
-  const resp = await fetch(`/api/runs/${id}/rerun`, { method: 'POST' });
-  if (!resp.ok) throw new Error('Failed to re-run analysis');
-}
-
-export async function fetchGrids(): Promise<GridInfo[]> {
-  const resp = await fetch('/api/grids');
-  if (!resp.ok) throw new Error('Failed to fetch grids');
-  return resp.json();
-}
-
-export async function fetchBench(): Promise<BenchItem[]> {
-  const resp = await fetch('/api/bench');
-  if (!resp.ok) throw new Error('Failed to fetch bench');
-  return resp.json();
-}
+};

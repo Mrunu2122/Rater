@@ -5,19 +5,23 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.config import settings
 from backend.app.storage.models import Base
 
-# Support SQLite fallback for local test execution if postgres is offline
 db_url = settings.DATABASE_URL
 sync_db_url = settings.DATABASE_URL_SYNC
 
-if "sqlite" in db_url:
+if settings.APP_ENV == "production":
+    if not db_url or "sqlite" in db_url:
+        raise RuntimeError("Production requires a valid PostgreSQL database URL.")
     async_engine = create_async_engine(db_url, echo=False)
-    sync_engine = create_engine(sync_db_url, echo=False)
+    sync_engine = create_engine(sync_db_url or db_url.replace("+asyncpg", ""), echo=False)
 else:
-    try:
+    # Dev / Test environment: Use Postgres if provided, else use persistent SQLite
+    if db_url and "postgres" in db_url:
         async_engine = create_async_engine(db_url, echo=False)
-        sync_engine = create_engine(sync_db_url, echo=False)
-    except Exception:
-        # Fallback to local SQLite for isolated testing
+        sync_engine = create_engine(sync_db_url or db_url.replace("+asyncpg", ""), echo=False)
+    elif db_url and "sqlite" in db_url:
+        async_engine = create_async_engine(db_url, echo=False)
+        sync_engine = create_engine(sync_db_url or db_url.replace("+aiosqlite", ""), echo=False)
+    else:
         sqlite_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
         os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
         async_engine = create_async_engine(f"sqlite+aiosqlite:///{sqlite_path}")

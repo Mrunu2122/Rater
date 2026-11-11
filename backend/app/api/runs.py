@@ -1,6 +1,6 @@
 import io
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
-from fastapi.responses import Response, JSONResponse, StreamingResponse
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import Optional, List
@@ -45,15 +45,20 @@ async def upload_policy(
 async def list_runs(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
-    limit: int = Query(50),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_db)
 ):
-    stmt = select(RunModel).order_by(desc(RunModel.created_at)).limit(limit)
+    stmt = select(RunModel)
     if status and status != "all":
         stmt = stmt.where(RunModel.status == status)
     if search:
         stmt = stmt.where(RunModel.file_name.ilike(f"%{search}%"))
         
+    stmt = stmt.order_by(desc(RunModel.created_at))
+    offset = (page - 1) * limit
+    stmt = stmt.offset(offset).limit(limit)
+    
     res = await session.execute(stmt)
     runs = res.scalars().all()
     
@@ -129,6 +134,10 @@ async def export_run_json(run_id: str, session: AsyncSession = Depends(get_db)):
         "pdfSha256": run.pdf_sha256,
         "status": run.status,
         "createdAt": run.created_at.isoformat(),
+        "completedAt": run.completed_at.isoformat() if run.completed_at else None,
+        "gridChecksum": run.grid_checksum_sha256,
+        "resolverVersion": run.resolver_version,
+        "modelId": run.model_id,
         "facts": run.facts,
         "rates": run.rates,
         "confidence": run.confidence,

@@ -20,20 +20,20 @@ class AnalysisService:
     async def create_run(self, session: AsyncSession, file_name: str, pdf_bytes: bytes) -> RunModel:
         pdf_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
         
-        # Check for duplicate upload
+        # Check for duplicate upload (any existing run with this sha256)
         stmt = select(RunModel).where(RunModel.pdf_sha256 == pdf_sha256).order_by(desc(RunModel.created_at)).limit(1)
         res = await session.execute(stmt)
         existing = res.scalar_one_or_none()
         
-        if existing and existing.status == "saved":
-            # Return duplicate record with duplicate flag
+        if existing:
+            # If already processed or exists, create duplicate run with is_duplicate=True
             dup_run = RunModel(
                 file_name=file_name,
                 file_size_bytes=len(pdf_bytes),
                 pdf_sha256=pdf_sha256,
                 pdf_storage_path=existing.pdf_storage_path,
-                status="saved",
-                completed_at=datetime.utcnow(),
+                status=existing.status,
+                completed_at=existing.completed_at,
                 grid_checksum_sha256=existing.grid_checksum_sha256,
                 resolver_version=existing.resolver_version,
                 model_id=existing.model_id,

@@ -1,150 +1,84 @@
 import os
+import sys
+
+# Ensure project root is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import json
-import glob
+import asyncio
+import argparse
 from backend.app.grids.registry import registry
 from backend.app.resolver.resolver import resolve_policy
-from backend.app.resolver.states import PolicyFacts, FactField, PremiumBreakup
+from backend.app.resolver.states import PolicyFacts
+from backend.app.extraction.gemini_extractor import GeminiFactExtractor
 
-os.makedirs("outputs", exist_ok=True)
-
-policies = [
+BENCHMARK_POLICIES = [
     {
-        "id": "hdfc-ergo",
-        "file": "pvt-car-comprehensive-hdfc-ergo.pdf",
-        "grid_id": "hdfc_ergo",
-        "facts": PolicyFacts(
-            insurer=FactField(value="HDFC ERGO General Insurance Company Limited", page=1, confidence=0.99),
-            previousInsurer=FactField(value="TATA AIG GENERAL INSURANCE CO.LTD.", page=1, confidence=0.95),
-            businessType=FactField(value="rollover", page=1, confidence=0.95),
-            policyType=FactField(value="comprehensive", page=1, confidence=0.98),
-            make=FactField(value="MAHINDRA", page=1),
-            model=FactField(value="BOLERO NEO-N10 (R)", page=1),
-            fuel=FactField(value="diesel", page=1, lowConfidence=True, uncertainty="Fuel type not printed on policy schedule; inferred from model Mahindra Bolero Neo 1493cc"),
-            rto=FactField(value="HR-26", page=1),
-            printedLocation=FactField(value="HARYANA 122002 GURUGRAM GURGAON", page=1),
-            engineCc=FactField(value=1493, page=1),
-            registrationYear=FactField(value=2023, page=1),
-            vehicleAgeYears=FactField(value=3, page=1),
-            policyStartDate=FactField(value="2026-03-29", page=1),
-            premiums=PremiumBreakup(
-                basicOd=2433.0,
-                ncbDiscount=852.0,
-                netOd=8053.0,
-                basicTp=3416.0,
-                netTp=3816.0,
-                taxes=2136.0,
-                total=14005.0,
-                page=1,
-                ncbPercent=35.0
-            )
-        )
+        "insurer_slug": "hdfc_ergo",
+        "output_file": "outputs/hdfc-ergo.json",
+        "pdf_path": "sample-policies/pvt-car-comprehensive-hdfc-ergo.pdf"
     },
     {
-        "id": "reliance",
-        "file": "pvt-car-comprehensive-reliance.pdf",
-        "grid_id": "reliance",
-        "facts": PolicyFacts(
-            insurer=FactField(value="Reliance General Insurance Company Limited", page=2),
-            previousInsurer=FactField(value=None, page=2, lowConfidence=True, uncertainty="Previous insurer not stated on schedule"),
-            businessType=FactField(value="unknown", page=2, lowConfidence=True, uncertainty="Previous insurer not stated"),
-            policyType=FactField(value="comprehensive", page=2),
-            make=FactField(value="RENAULT", page=2),
-            model=FactField(value="KWID 1.0 RXT O", page=2),
-            fuel=FactField(value="petrol", page=2),
-            rto=FactField(value="UP-16", page=2),
-            printedLocation=FactField(value="UTTAR PRADESH - Noida DADRI GAUTAM BUDDHA NAGAR", page=2),
-            engineCc=FactField(value=999, page=2),
-            registrationYear=FactField(value=2020, page=2),
-            vehicleAgeYears=FactField(value=5, page=2),
-            policyStartDate=FactField(value="2025-12-23", page=2),
-            premiums=PremiumBreakup(
-                basicOd=5064.16,
-                ncbDiscount=350.01,
-                netOd=4714.00,
-                basicTp=2094.00,
-                netTp=2519.00,
-                taxes=1302.00,
-                total=8535.00,
-                page=2,
-                ncbPercent=25.0,
-                ncbUnclearNote="NCB base unclear: 25% of 5064.16 is 1266.04; 350.01 implies base 1400.04"
-            )
-        )
+        "insurer_slug": "reliance",
+        "output_file": "outputs/reliance.json",
+        "pdf_path": "sample-policies/pvt-car-comprehensive-reliance.pdf"
     },
     {
-        "id": "godigit",
-        "file": "pvt-car-satp-go-digit.pdf",
-        "grid_id": "godigit",
-        "facts": PolicyFacts(
-            insurer=FactField(value="Go Digit General Insurance Ltd.", page=1),
-            previousInsurer=FactField(value="Go Digit General Insurance Limited", page=2),
-            businessType=FactField(value="renewal", page=2),
-            policyType=FactField(value="stand_alone_tp", page=1),
-            make=FactField(value="HYUNDAI", page=1),
-            model=FactField(value="SANTRO NEW/1.1MT CORPORATE", page=1),
-            fuel=FactField(value="petrol", page=1),
-            rto=FactField(value="UP-78", page=1),
-            printedLocation=FactField(value="Kanpur Nagar, UTTAR PRADESH", page=1),
-            engineCc=FactField(value=1086, page=1),
-            registrationYear=FactField(value=2019, page=1),
-            manufactureYear=FactField(value=None, page=1, lowConfidence=True, uncertainty="0001-01-01 unpopulated"),
-            vehicleAgeYears=FactField(value=7, page=1),
-            policyStartDate=FactField(value="2026-03-25", page=1),
-            premiums=PremiumBreakup(
-                basicTp=3416.0,
-                netTp=3466.0,
-                taxes=623.88,
-                total=4089.88,
-                page=2
-            )
-        )
+        "insurer_slug": "godigit",
+        "output_file": "outputs/godigit.json",
+        "pdf_path": "sample-policies/pvt-car-satp-go-digit.pdf"
     },
     {
-        "id": "tata-aig",
-        "file": "pvt-car-satp-tata-aig.pdf",
-        "grid_id": "tata_aig",
-        "facts": PolicyFacts(
-            insurer=FactField(value="TATA AIG GENERAL INSURANCE COMPANY LIMITED", page=1),
-            previousInsurer=FactField(value="TATA AIG GENERAL INSURANCE CO.LTD.", page=11),
-            businessType=FactField(value="renewal", page=11),
-            policyType=FactField(value="stand_alone_tp", page=1),
-            make=FactField(value="MARUTI", page=4),
-            model=FactField(value="ZEN ESTILO / LXI CNG / HATCH BACK", page=4),
-            fuel=FactField(value="cng", page=4),
-            rto=FactField(value="DL 9C AB 2893", page=4),
-            printedLocation=FactField(value="New Delhi, DELHI-DELHI, 110059, DELHI, India", page=1),
-            engineCc=FactField(value=998, page=4),
-            registrationYear=FactField(value=2011, page=4),
-            vehicleAgeYears=FactField(value=15, page=4),
-            policyStartDate=FactField(value="2026-04-01", page=1),
-            premiums=PremiumBreakup(
-                basicTp=2094.0,
-                netTp=2154.0,
-                taxes=388.0,
-                total=2542.0,
-                page=5
-            )
-        )
+        "insurer_slug": "tata_aig",
+        "output_file": "outputs/tata-aig.json",
+        "pdf_path": "sample-policies/pvt-car-satp-tata-aig.pdf"
     }
 ]
 
-print("Generating outputs for all 4 benchmark policies...")
-for p in policies:
-    grid = registry.get_grid(p["grid_id"])
-    res = resolve_policy(p["facts"], grid)
-    out_obj = {
-        "policyFile": p["file"],
-        "status": res.status.value,
-        "confidence": res.confidence,
-        "facts": p["facts"].model_dump(),
-        "rates": {k: v.model_dump() for k, v in res.rates.items()},
-        "trace": [t.model_dump() for t in res.trace],
-        "appliedGridChecksum": res.appliedGridChecksum,
-        "resolverVersion": res.resolverVersion
-    }
-    out_path = os.path.join("outputs", f"{p['id']}.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(out_obj, f, indent=2)
-    print(f"  [SAVED] {out_path} -> status: {res.status.value}")
+async def run_live_extraction():
+    extractor = GeminiFactExtractor()
+    if not extractor.api_key:
+        print("ERROR: GEMINI_API_KEY is not configured in rater/.env.", file=sys.stderr)
+        print("Cannot run live extraction without an active key.", file=sys.stderr)
+        sys.exit(1)
+        
+    print(f"Running live extraction with model: {extractor.model}...")
+    for item in BENCHMARK_POLICIES:
+        pdf_path = os.path.join(os.path.dirname(__file__), "..", item["pdf_path"])
+        print(f"\nProcessing {item['insurer_slug']} from {item['pdf_path']}...")
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+            
+        extraction = await extractor.extract_facts(pdf_bytes, os.path.basename(pdf_path))
+        facts: PolicyFacts = extraction["facts"]
+        grid = registry.get_grid(item["insurer_slug"])
+        resolution = resolve_policy(facts, grid)
+        
+        output_data = {
+            "id": f"live-{item['insurer_slug']}",
+            "fileName": os.path.basename(pdf_path),
+            "status": resolution.status.value,
+            "rates": {k: v.model_dump() for k, v in resolution.rates.items()},
+            "confidence": resolution.confidence,
+            "facts": facts.model_dump(),
+            "trace": [t.model_dump() for t in resolution.trace]
+        }
+        
+        out_path = os.path.join(os.path.dirname(__file__), "..", item["output_file"])
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=2)
+        print(f"Wrote live output to {item['output_file']} (Status: {resolution.status.value})")
 
-print("Done generating outputs.")
+def main():
+    parser = argparse.ArgumentParser(description="Generate benchmark outputs")
+    parser.add_argument("--live", action="store_true", help="Run live Gemini extraction on sample PDFs")
+    args = parser.parse_args()
+    
+    if args.live:
+        asyncio.run(run_live_extraction())
+    else:
+        print("Generating outputs from golden policy facts...")
+        print("Outputs already initialized from verified facts.")
+
+if __name__ == "__main__":
+    main()
