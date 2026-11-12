@@ -21,25 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies directly
-RUN pip install --no-cache-dir \
-    fastapi==0.115.8 \
-    uvicorn[standard]==0.34.0 \
-    pydantic==2.10.6 \
-    pydantic-settings==2.7.1 \
-    sqlalchemy==2.0.38 \
-    aiosqlite==0.21.0 \
-    asyncpg==0.30.0 \
-    psycopg2-binary==2.9.10 \
-    boto3==1.36.21 \
-    google-genai==1.2.0 \
-    openpyxl==3.1.5 \
-    pdfplumber==0.11.5 \
-    pymupdf==1.25.3 \
-    pytesseract==0.3.13 \
-    pillow==11.1.0 \
-    python-multipart==0.0.20 \
-    httpx==0.28.1
+# Install python dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend application code and grid files
 COPY backend/ /app/backend/

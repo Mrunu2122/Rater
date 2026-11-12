@@ -40,11 +40,14 @@ def isolate_db_and_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(db_mod, "AsyncSessionLocal", TestAsyncSessionLocal)
     monkeypatch.setattr(db_mod, "SyncSessionLocal", TestSyncSessionLocal)
     
-    # Also patch direct imports in other modules
-    import backend.app.api.runs as runs_api
-    import backend.app.main as main_mod
-    monkeypatch.setattr(runs_api, "AsyncSessionLocal", TestAsyncSessionLocal)
-    monkeypatch.setattr(main_mod, "AsyncSessionLocal", TestAsyncSessionLocal)
+    # Also patch direct imports in other modules if loaded
+    try:
+        import backend.app.api.runs as runs_api
+        import backend.app.main as main_mod
+        monkeypatch.setattr(runs_api, "AsyncSessionLocal", TestAsyncSessionLocal)
+        monkeypatch.setattr(main_mod, "AsyncSessionLocal", TestAsyncSessionLocal)
+    except ImportError:
+        pass
     
     # Override get_db dependency for FastAPI
     async def override_get_db():
