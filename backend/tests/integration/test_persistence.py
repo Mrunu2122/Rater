@@ -3,7 +3,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from backend.app.main import app
 from backend.app.storage.models import RunModel
-from backend.app.storage.db import AsyncSessionLocal
+import backend.app.storage.db as db_module
 from sqlalchemy import select
 
 @pytest.mark.anyio
@@ -21,7 +21,7 @@ async def test_health_reports_backends():
 @pytest.mark.anyio
 async def test_persistence_across_restart():
     # Insert a record, simulate restart by querying via fresh session
-    async with AsyncSessionLocal() as session:
+    async with db_module.AsyncSessionLocal() as session:
         run = RunModel(
             id="test-restart-run-123",
             pdf_sha256="dummy-sha256",
@@ -34,7 +34,7 @@ async def test_persistence_across_restart():
         await session.commit()
 
     # Reconnect in a brand new async session
-    async with AsyncSessionLocal() as new_session:
+    async with db_module.AsyncSessionLocal() as new_session:
         stmt = select(RunModel).where(RunModel.id == "test-restart-run-123")
         result = await new_session.execute(stmt)
         persisted = result.scalar_one_or_none()

@@ -79,7 +79,7 @@ def test_rule_reliance_tp_not_published_h2():
     )
     grid = registry.get_grid("reliance")
     res = resolve_policy(facts, grid)
-    assert res.rates["tp"].state == ComponentState.UNSUPPORTED
+    assert res.rates["tp"].state == ComponentState.NOT_PUBLISHED
     assert "H2" in res.rates["tp"].citations[0]["coordinate"]
 
 def test_rule_tata_gwp_refusal():

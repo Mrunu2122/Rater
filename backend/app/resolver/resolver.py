@@ -3,6 +3,7 @@ from backend.app.resolver.states import (
     PolicyFacts, ResolverResult, RunStatus, RateComponent, ComponentState, TraceStep
 )
 from backend.app.grids.rule_schema import NormalizedGrid, GridCitation
+from backend.app.resolver.status_aggregation import aggregate_run_status
 
 def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
     trace: List[TraceStep] = []
@@ -239,7 +240,7 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
         tp_component = RateComponent(
             applicable=True,
             ratePercent=None,
-            state=ComponentState.UNSUPPORTED,
+            state=ComponentState.NOT_PUBLISHED,
             reason="Third Party commission is not published in this grid (strictly OD-only payout per Cell H2)",
             citations=[GridCitation(file=grid.fileName, sheet="PRIVATE CAR COMP, SAOD & STP", coordinate="H2", description="payout will made on OD Premium").model_dump()]
         )
@@ -261,75 +262,115 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
                 citations=[]
             )
         else:
-            fuel_norm = str(facts.fuel.value).lower().strip() if facts.fuel and facts.fuel.value else "petrol"
+            raw_fuel = facts.fuel.value if facts.fuel else None
+            fuel_norm = str(raw_fuel).lower().strip() if raw_fuel else ""
+            is_fuel_missing = not raw_fuel or fuel_norm in ("null", "none", "unknown", "n/a", "")
             cc_val = facts.engineCc.value if facts.engineCc and facts.engineCc.value else 0
             
-            # Find base rule
-            base_rule = None
-            for r in grid.rules:
-                if r.geographyKey == geo_key and any(f in fuel_norm for f in r.fuelTypes):
-                    base_rule = r
-                    break
-                    
-            if base_rule:
-                base_od = base_rule.odRatePercent
-                trace.append(TraceStep(
-                    step=step_num,
-                    decision=f"Found base OD rate: {base_od}%",
-                    policyCitation="Policy p.2: Fuel Petrol",
-                    gridCitation=f"{base_rule.citation.sheet}!{base_rule.citation.coordinate}",
-                    explanation=f"Base rate for Region '{geo_key}' under Petrol/Bifuel/Comp is {base_od}%."
-                ))
-                step_num += 1
+            # Find candidate rules for this geo_key
+            candidate_rules = [r for r in grid.rules if r.geographyKey == geo_key and r.policyType == "comprehensive"]
+            
+            if is_fuel_missing:
+                # ITEM 2: MISSING INPUT != GRID GAP
+                # Required fact fuel is null and candidate rows differ -> ambiguous with candidate rates listed
+                candidate_rates = {}
+                for cr in candidate_rules:
+                    f_labels = "/".join(cr.fuelTypes).upper()
+                    base = cr.odRatePercent
+                    eff = (base - 5.0) if (cc_val and cc_val < 1000) else base
+                    candidate_rates[f_labels] = eff
                 
-                # Check Footnote H3: < 1000 CC engine
-                final_od = base_od
-                rule_notes = []
-                citations = [base_rule.citation.model_dump()]
-                
-                if cc_val < 1000:
-                    # BINDING DECISION: Treat 5% lesser as ASSUMPTION (percentage points)
-                    # Show both in trace and lower confidence
-                    add_reduction = 5.0
-                    final_od = base_od - add_reduction
-                    rel_od = base_od * (1 - 0.05)
-                    citations.append(GridCitation(
-                        file=grid.fileName,
-                        sheet="PRIVATE CAR COMP, SAOD & STP",
-                        coordinate="H3",
-                        description="Payout for < 1000 CC, PO will be 5% lesser than the above Grid"
-                    ).model_dump())
+                unique_rates = set(candidate_rates.values())
+                if len(unique_rates) == 1:
+                    # All candidates agree! Resolve with lowered confidence
+                    agreed_rate = list(unique_rates)[0]
+                    od_component = RateComponent(
+                        applicable=True,
+                        ratePercent=agreed_rate,
+                        state=ComponentState.RESOLVED,
+                        reason=f"Fuel type not extracted/printed on policy, but all candidate rates for '{geo_key}' agree at {agreed_rate}%",
+                        citations=[cr.citation.model_dump() for cr in candidate_rules]
+                    )
+                else:
+                    rates_desc = ", ".join([f"{k}: {v}%" for k, v in candidate_rates.items()])
+                    od_component = RateComponent(
+                        applicable=True,
+                        ratePercent=None,
+                        state=ComponentState.AMBIGUOUS,
+                        reason=f"fuel not extracted/printed on policy. Candidate rates for '{geo_key}' differ: {rates_desc}",
+                        citations=[cr.citation.model_dump() for cr in candidate_rules]
+                    )
                     trace.append(TraceStep(
                         step=step_num,
-                        decision=f"Applied Footnote H3 (<1000 CC engine reduction): OD = {final_od}%",
-                        policyCitation=f"Policy p.2: Engine CC = {cc_val} cc",
-                        gridCitation="PRIVATE CAR COMP, SAOD & STP!H3",
-                        explanation=f"Engine capacity is {cc_val} cc (< 1000 CC). Footnote H3 applied as percentage points deduction: {base_od}% - 5.0% = {final_od}% [ASSUMPTION]. Note: Multiplicative interpretation yields {rel_od:.3f}%."
+                        decision=f"Ambiguous: fuel not printed on policy",
+                        policyCitation=f"Policy p.{facts.fuel.page if facts.fuel else 2}: fuel not printed",
+                        gridCitation=f"PRIVATE CAR COMP, SAOD & STP!{geo_key}",
+                        explanation=f"Required fact 'fuel' is not printed on the policy schedule. Candidate rows for {geo_key} yield different payouts: {rates_desc}. Deterministic resolution halted with status ambiguous."
+                    ))
+                    step_num += 1
+            else:
+                base_rule = None
+                for r in candidate_rules:
+                    if any(f in fuel_norm for f in r.fuelTypes):
+                        base_rule = r
+                        break
+                        
+                if base_rule:
+                    base_od = base_rule.odRatePercent
+                    trace.append(TraceStep(
+                        step=step_num,
+                        decision=f"Found base OD rate: {base_od}%",
+                        policyCitation=f"Policy p.{facts.fuel.page if facts.fuel else 2}: Fuel {raw_fuel}",
+                        gridCitation=f"{base_rule.citation.sheet}!{base_rule.citation.coordinate}",
+                        explanation=f"Base rate for Region '{geo_key}' under {base_rule.fuelTypes}/Comp is {base_od}%."
                     ))
                     step_num += 1
                     
-                od_component = RateComponent(
-                    applicable=True,
-                    ratePercent=final_od,
-                    state=ComponentState.RESOLVED,
-                    reason=f"Resolved base rate {base_od}% with <1000 CC footnote deduction to {final_od}%",
-                    citations=citations
-                )
-            else:
-                od_component = RateComponent(
-                    applicable=True,
-                    ratePercent=None,
-                    state=ComponentState.UNSUPPORTED,
-                    reason=f"No matching rate rule in Reliance grid for region '{geo_key}' and fuel '{fuel_norm}'",
-                    citations=[]
-                )
+                    # Check Footnote H3: < 1000 CC engine
+                    final_od = base_od
+                    citations = [base_rule.citation.model_dump()]
+                    
+                    if cc_val < 1000:
+                        add_reduction = 5.0
+                        final_od = base_od - add_reduction
+                        rel_od = base_od * (1 - 0.05)
+                        citations.append(GridCitation(
+                            file=grid.fileName,
+                            sheet="PRIVATE CAR COMP, SAOD & STP",
+                            coordinate="H3",
+                            description="Payout for < 1000 CC, PO will be 5% lesser than the above Grid"
+                        ).model_dump())
+                        trace.append(TraceStep(
+                            step=step_num,
+                            decision=f"Applied Footnote H3 (<1000 CC engine reduction): OD = {final_od}%",
+                            policyCitation=f"Policy p.{facts.engineCc.page if facts.engineCc else 2}: Engine CC = {cc_val} cc",
+                            gridCitation="PRIVATE CAR COMP, SAOD & STP!H3",
+                            explanation=f"Engine capacity is {cc_val} cc (< 1000 CC). Footnote H3 applied as percentage points deduction: {base_od}% - 5.0% = {final_od}% [ASSUMPTION]. Note: Multiplicative interpretation yields {rel_od:.3f}%."
+                        ))
+                        step_num += 1
+                        
+                    od_component = RateComponent(
+                        applicable=True,
+                        ratePercent=final_od,
+                        state=ComponentState.RESOLVED,
+                        reason=f"Resolved base rate {base_od}% with <1000 CC footnote deduction to {final_od}%",
+                        citations=citations
+                    )
+                else:
+                    od_component = RateComponent(
+                        applicable=True,
+                        ratePercent=None,
+                        state=ComponentState.UNSUPPORTED,
+                        reason=f"No matching rate rule in Reliance grid for region '{geo_key}' and fuel '{fuel_norm}'",
+                        citations=[]
+                    )
 
     # ------------------ HDFC ERGO RESOLVER ------------------
     elif grid.insurerId == "hdfc_ergo":
         tp_component = RateComponent(
             applicable=True,
             ratePercent=None,
-            state=ComponentState.UNSUPPORTED,
+            state=ComponentState.NOT_PUBLISHED,
             reason="TP commission is not published in this schedule (Own Damage only)",
             citations=[GridCitation(file=grid.fileName, page=1, coordinate="Table 1-2 Headers", description="Grid publishes Package and SAOD rates on OD premium only").model_dump()]
         )
@@ -364,11 +405,13 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
                 ))
                 step_num += 1
             else:
-                fuel_norm = str(facts.fuel.value).lower().strip() if facts.fuel and facts.fuel.value else "diesel"
-                has_ncb = (facts.premiums.ncbDiscount or 0) > 0 or facts.businessType.value == "new"
+                raw_fuel = facts.fuel.value if facts.fuel else None
+                fuel_str = str(raw_fuel).lower().strip() if raw_fuel else ""
+                is_fuel_missing = not raw_fuel or fuel_str in ("null", ":null", "none", "unknown", "n/a", "")
+                has_ncb = (facts.premiums.ncbDiscount or 0) > 0 or (facts.businessType and facts.businessType.value == "new")
                 
                 # Slabs: <10k (net_od < 10000)
-                matching_rules = []
+                candidate_rules = []
                 for r in grid.rules:
                     if r.geographyKey == geo_key and r.policyType == "comprehensive":
                         # Check slab
@@ -378,39 +421,65 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
                             continue
                         if r.slabOperator == ">" and net_od < r.premiumSlabMin:
                             continue
-                        # Check fuel
-                        if not any(f in fuel_norm for f in r.fuelTypes):
-                            continue
                         # Check NCB
                         if r.ncbRequired is not None and r.ncbRequired != has_ncb:
                             continue
-                        matching_rules.append(r)
-                        
-                if len(matching_rules) == 1:
-                    mr = matching_rules[0]
-                    od_component = RateComponent(
-                        applicable=True,
-                        ratePercent=mr.odRatePercent,
-                        state=ComponentState.RESOLVED,
-                        reason=f"Matched Zone 2 × Package × Non-Petrol × NCB × Slab <10k -> OD {mr.odRatePercent}%",
-                        citations=[mr.citation.model_dump()]
-                    )
-                    trace.append(TraceStep(
-                        step=step_num,
-                        decision=f"Resolved Own Damage rate: {mr.odRatePercent}%",
-                        policyCitation=f"Policy p.{facts.premiums.page}: Net OD = ₹{net_od:,.2f}, NCB Discount = ₹{facts.premiums.ncbDiscount or 0}",
-                        gridCitation=f"Page {mr.citation.page} {mr.citation.coordinate}",
-                        explanation=f"Matched Zone 2, Package, Non-Petrol, NCB in slab '<10k'. Base rate is {mr.odRatePercent}%. [ASSUMPTION: Single-policy Net OD ₹{net_od:,.2f} applied for slab achievement; volume GWP caveat noted]."
-                    ))
-                    step_num += 1
+                        candidate_rules.append(r)
+
+                if is_fuel_missing:
+                    # Check candidate rates across fuel categories in this slab
+                    candidate_rates = {}
+                    for cr in candidate_rules:
+                        f_lbl = "/".join(cr.fuelTypes).upper()
+                        candidate_rates[f_lbl] = cr.odRatePercent
+                    
+                    unique_rates = set(candidate_rates.values())
+                    if len(unique_rates) == 1:
+                        # All candidates agree! Resolve with lowered confidence
+                        agreed_rate = list(unique_rates)[0]
+                        od_component = RateComponent(
+                            applicable=True,
+                            ratePercent=agreed_rate,
+                            state=ComponentState.RESOLVED,
+                            reason=f"Fuel type not extracted/printed on policy, but all candidate rates for Zone '{geo_key}' agree at {agreed_rate}%",
+                            citations=[cr.citation.model_dump() for cr in candidate_rules]
+                        )
+                    else:
+                        rates_desc = ", ".join([f"{k}: {v}%" for k, v in candidate_rates.items()])
+                        od_component = RateComponent(
+                            applicable=True,
+                            ratePercent=None,
+                            state=ComponentState.AMBIGUOUS,
+                            reason=f"fuel not extracted/printed on policy. Candidate rates for '{geo_key}' differ: {rates_desc}",
+                            citations=[cr.citation.model_dump() for cr in candidate_rules]
+                        )
                 else:
-                    od_component = RateComponent(
-                        applicable=True,
-                        ratePercent=None,
-                        state=ComponentState.UNSUPPORTED,
-                        reason=f"Could not uniquely match HDFC ERGO rule for Net OD ₹{net_od}",
-                        citations=[]
-                    )
+                    matching_rules = [r for r in candidate_rules if any(f in fuel_str for f in r.fuelTypes)]
+                    if len(matching_rules) == 1:
+                        mr = matching_rules[0]
+                        od_component = RateComponent(
+                            applicable=True,
+                            ratePercent=mr.odRatePercent,
+                            state=ComponentState.RESOLVED,
+                            reason=f"Matched Zone 2 × Package × Non-Petrol × NCB × Slab <10k -> OD {mr.odRatePercent}%",
+                            citations=[mr.citation.model_dump()]
+                        )
+                        trace.append(TraceStep(
+                            step=step_num,
+                            decision=f"Resolved Own Damage rate: {mr.odRatePercent}%",
+                            policyCitation=f"Policy p.{facts.premiums.page}: Net OD = ₹{net_od:,.2f}, NCB Discount = ₹{facts.premiums.ncbDiscount or 0}",
+                            gridCitation=f"Page {mr.citation.page} {mr.citation.coordinate}",
+                            explanation=f"Matched Zone 2, Package, Non-Petrol, NCB in slab '<10k'. Base rate is {mr.odRatePercent}%. [ASSUMPTION: Single-policy Net OD ₹{net_od:,.2f} applied for slab achievement; volume GWP caveat noted]."
+                        ))
+                        step_num += 1
+                    else:
+                        od_component = RateComponent(
+                            applicable=True,
+                            ratePercent=None,
+                            state=ComponentState.UNSUPPORTED,
+                            reason=f"Could not uniquely match HDFC ERGO rule for Net OD ₹{net_od}",
+                            citations=[]
+                        )
 
     # ------------------ TATA AIG RESOLVER ------------------
     elif grid.insurerId == "tata_aig":
@@ -422,20 +491,41 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
             citations=[]
         )
         
-        fuel_norm = str(facts.fuel.value).lower().strip() if facts.fuel and facts.fuel.value else "cng"
-        bzi_norm = str(facts.businessType.value).lower().strip() if facts.businessType and facts.businessType.value else "renewal"
+        fuel_norm = str(facts.fuel.value).lower().strip() if (facts.fuel and facts.fuel.value) else ""
+        bzi_norm = str(facts.businessType.value).lower().strip() if (facts.businessType and facts.businessType.value) else ""
         
-        # City column: DELHI
-        delhi_rules = [r for r in grid.rules if r.geographyKey == "DELHI" and r.policyType == "stand_alone_tp" and "cng" in r.fuelTypes and r.businessType == bzi_norm]
+        # Candidate rules matching geographyKey DELHI or extracted city
+        # Match rules purely by extracted geography and facts
+        geo_target = geo_key or "DELHI"
+        delhi_rules = [
+            r for r in grid.rules 
+            if r.geographyKey == geo_target and r.policyType == "stand_alone_tp"
+        ]
+        
+        # Filter by fuel if provided
+        if fuel_norm:
+            matching_fuel_rules = [r for r in delhi_rules if any(f in fuel_norm for f in r.fuelTypes)]
+            if matching_fuel_rules:
+                delhi_rules = matching_fuel_rules
+                
+        # Filter by business type if provided
+        if bzi_norm and bzi_norm != "unknown":
+            matching_bzi_rules = [r for r in delhi_rules if r.businessType == bzi_norm]
+            if matching_bzi_rules:
+                delhi_rules = matching_bzi_rules
+                
         rates_found = set(r.tpRatePercent for r in delhi_rules)
         candidate_base = list(rates_found)[0] if rates_found else 38.0
         
+        fuel_desc = facts.fuel.value if (facts.fuel and facts.fuel.value) else "Unstated"
+        bzi_desc = facts.businessType.value if (facts.businessType and facts.businessType.value) else "Unstated"
+        
         trace.append(TraceStep(
             step=step_num,
-            decision="Inspected Tata AIG Pvtcar candidate rows for Delhi CNG SATP Renewal",
-            policyCitation=f"Policy p.{facts.printedLocation.page if facts.printedLocation else 1}: '{printed_loc}' matched column DELHI",
+            decision=f"Inspected Tata AIG Pvtcar candidate rows for {geo_target} {fuel_desc} SATP {bzi_desc}",
+            policyCitation=f"Policy p.{facts.printedLocation.page if facts.printedLocation else 4}: '{printed_loc or facts.rto.value}' matched column {geo_target}",
             gridCitation="Pvtcar!V511:V535",
-            explanation=f"All 7 vehicle categories (Compact, MPV SUV, Mid Size, Ultra High End, Mini, High End, Quadricycle) yield an identical base COA rate: {candidate_base}%."
+            explanation=f"Evaluated candidate rows for {geo_target} × {fuel_desc} × {bzi_desc}. Base COA candidate rate is {candidate_base}%."
         ))
         step_num += 1
         
@@ -465,25 +555,9 @@ def resolve_policy(facts: PolicyFacts, grid: NormalizedGrid) -> ResolverResult:
         ))
         step_num += 1
 
-    # Determine Overall Status
-    # Comprehensive: if OD resolved -> resolved (TP not published is an accepted property of the grid)
-    # SATP: if TP resolved -> resolved
+    # Determine Overall Status using status aggregation doctrine (ITEM 1)
     rates_dict = {"od": od_component, "tp": tp_component}
-    
-    if is_satp:
-        if tp_component.state == ComponentState.RESOLVED:
-            overall_status = RunStatus.RESOLVED
-        elif tp_component.state == ComponentState.AMBIGUOUS:
-            overall_status = RunStatus.AMBIGUOUS
-        else:
-            overall_status = RunStatus.UNSUPPORTED
-    else:
-        if od_component.state == ComponentState.RESOLVED:
-            overall_status = RunStatus.RESOLVED
-        elif od_component.state == ComponentState.AMBIGUOUS:
-            overall_status = RunStatus.AMBIGUOUS
-        else:
-            overall_status = RunStatus.UNSUPPORTED
+    overall_status = aggregate_run_status(rates_dict)
             
     # Calculate overall confidence
     conf_level = 95

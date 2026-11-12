@@ -1,9 +1,12 @@
 import os
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from backend.app.config import settings
 from backend.app.storage.models import Base
+
+logger = logging.getLogger("rater.db")
 
 db_url = settings.DATABASE_URL
 sync_db_url = settings.DATABASE_URL_SYNC
@@ -22,8 +25,13 @@ else:
         async_engine = create_async_engine(db_url, echo=False)
         sync_engine = create_engine(sync_db_url or db_url.replace("+aiosqlite", ""), echo=False)
     else:
-        sqlite_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
-        os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
+        sqlite_path = os.environ.get(
+            "RATER_SQLITE_PATH",
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
+        )
+        dir_name = os.path.dirname(sqlite_path)
+        if dir_name and not os.environ.get("PYTEST_CURRENT_TEST"):
+            os.makedirs(dir_name, exist_ok=True)
         async_engine = create_async_engine(f"sqlite+aiosqlite:///{sqlite_path}")
         sync_engine = create_engine(f"sqlite:///{sqlite_path}")
 
@@ -31,7 +39,15 @@ AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)
 SyncSessionLocal = sessionmaker(sync_engine)
 
 def init_db_sync():
-    Base.metadata.create_all(bind=sync_engine)
+    # If using postgresql+asyncpg without a separate sync driver, or sqlite
+    try:
+        Base.metadata.create_all(bind=sync_engine)
+    except Exception as e:
+        logger.warning(f"Sync create_all failed: {e}. Falling back to async engine run_sync.")
+
+async def init_db_async():
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 async def get_db():
     async with AsyncSessionLocal() as session:

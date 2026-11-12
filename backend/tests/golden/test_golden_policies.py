@@ -41,7 +41,7 @@ def test_hdfc_ergo_golden():
     assert res.rates["od"].applicable is True
     assert res.rates["od"].state == ComponentState.RESOLVED
     assert res.rates["od"].ratePercent == 15.0 # Zone 2 Table, Row 5 (<10k), Col 3 (Package, Non-Petrol, NCB)
-    assert res.rates["tp"].state == ComponentState.UNSUPPORTED # TP not published in HDFC schedule
+    assert res.rates["tp"].state == ComponentState.NOT_PUBLISHED # TP not published in HDFC schedule
     assert len(res.trace) >= 4
 
 def test_hdfc_ergo_exact_slab_boundary():
@@ -103,7 +103,7 @@ def test_reliance_golden():
     # Base rate 22.5% minus 5.0% = 17.5%
     assert res.rates["od"].ratePercent == 17.5
     # TP strictly not published per H2
-    assert res.rates["tp"].state == ComponentState.UNSUPPORTED
+    assert res.rates["tp"].state == ComponentState.NOT_PUBLISHED
     assert "H2" in res.rates["tp"].citations[0]["coordinate"]
 
 def test_godigit_golden():

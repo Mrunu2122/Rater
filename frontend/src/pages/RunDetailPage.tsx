@@ -147,7 +147,7 @@ export const RunDetailPage: React.FC<RunDetailPageProps> = ({ run, onBack, onRer
               <div className="rate-card-header">
                 <span className="rate-card-label">Third Party (TP) Commission</span>
                 <span className={`rate-state-pill state-${tpRate?.state || 'none'}`}>
-                  {tpRate?.state === 'not_applicable' ? 'Not Applicable' : tpRate?.state || 'Unknown'}
+                  {tpRate?.state === 'not_applicable' ? 'Not Applicable' : tpRate?.state === 'not_published' ? 'Not Published' : tpRate?.state || 'Unknown'}
                 </span>
               </div>
               <div className="rate-card-body">
@@ -157,7 +157,7 @@ export const RunDetailPage: React.FC<RunDetailPageProps> = ({ run, onBack, onRer
                   </div>
                 ) : (
                   <div className="rate-value-empty">
-                    <span>{tpRate?.state === 'not_applicable' ? 'N/A' : 'Not Published / Unsupported'}</span>
+                    <span>{tpRate?.state === 'not_applicable' ? 'N/A' : tpRate?.state === 'not_published' ? 'Not Published' : 'Unsupported'}</span>
                   </div>
                 )}
                 <p className="rate-reason-text">{tpRate?.reason || 'No Third Party coverage specified.'}</p>
@@ -227,7 +227,14 @@ export const RunDetailPage: React.FC<RunDetailPageProps> = ({ run, onBack, onRer
                     <td className="fact-label">Registration / Age</td>
                     <td className="fact-val">
                       {run.facts?.registrationYear?.value || '—'} 
-                      {run.facts?.vehicleAgeYears?.value !== undefined ? ` (${run.facts.vehicleAgeYears.value} yrs)` : ''}
+                      {run.facts?.vehicleAgeYears?.value !== undefined && run.facts?.vehicleAgeYears?.value !== null 
+                        ? ` (${run.facts.vehicleAgeYears.value} yrs)` 
+                        : ''}
+                      {run.facts?.vehicleAgeYears?.uncertainty && (
+                        <span className="page-badge" title={run.facts.vehicleAgeYears.uncertainty}>
+                          {run.facts.vehicleAgeYears.uncertainty}
+                        </span>
+                      )}
                     </td>
                   </tr>
                   <tr>
@@ -251,25 +258,33 @@ export const RunDetailPage: React.FC<RunDetailPageProps> = ({ run, onBack, onRer
                   <tbody>
                     <tr>
                       <td className="prem-label">Basic Own Damage (OD)</td>
-                      <td className="prem-val font-mono">₹{run.facts.premiums.basicOd?.toLocaleString('en-IN') ?? '—'}</td>
+                      <td className="prem-val font-mono">
+                        {odRate?.applicable === false ? '—' : run.facts.premiums.basicOd != null ? `₹${run.facts.premiums.basicOd.toLocaleString('en-IN')}` : '—'}
+                      </td>
                     </tr>
                     <tr>
                       <td className="prem-label">NCB Discount ({run.facts.premiums.ncbPercent ?? 0}%)</td>
                       <td className="prem-val font-mono text-success">
-                        -₹{run.facts.premiums.ncbDiscount?.toLocaleString('en-IN') ?? '0.00'}
+                        {odRate?.applicable === false ? '—' : run.facts.premiums.ncbDiscount ? `-₹${run.facts.premiums.ncbDiscount.toLocaleString('en-IN')}` : '—'}
                       </td>
                     </tr>
                     <tr className="prem-row-net">
                       <td className="prem-label">Net OD Premium</td>
-                      <td className="prem-val font-mono font-bold">₹{run.facts.premiums.netOd?.toLocaleString('en-IN') ?? '—'}</td>
+                      <td className="prem-val font-mono font-bold">
+                        {odRate?.applicable === false ? '—' : run.facts.premiums.netOd != null ? `₹${run.facts.premiums.netOd.toLocaleString('en-IN')}` : '—'}
+                      </td>
                     </tr>
                     <tr>
                       <td className="prem-label">Basic Third Party (TP)</td>
-                      <td className="prem-val font-mono">₹{run.facts.premiums.basicTp?.toLocaleString('en-IN') ?? '—'}</td>
+                      <td className="prem-val font-mono">
+                        {tpRate?.applicable === false ? '—' : run.facts.premiums.basicTp != null ? `₹${run.facts.premiums.basicTp.toLocaleString('en-IN')}` : '—'}
+                      </td>
                     </tr>
                     <tr>
                       <td className="prem-label">Net TP Premium</td>
-                      <td className="prem-val font-mono">₹{run.facts.premiums.netTp?.toLocaleString('en-IN') ?? '—'}</td>
+                      <td className="prem-val font-mono">
+                        {tpRate?.applicable === false ? '—' : run.facts.premiums.netTp != null ? `₹${run.facts.premiums.netTp.toLocaleString('en-IN')}` : '—'}
+                      </td>
                     </tr>
                     <tr>
                       <td className="prem-label">GST / Taxes</td>

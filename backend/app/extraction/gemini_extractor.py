@@ -15,11 +15,29 @@ GEMINI_SYSTEM_INSTRUCTION = """
 You are an expert Indian motor insurance policy schedule analyst.
 Extract ground truth policy fields strictly from the provided policy schedule pages.
 Do NOT invent or guess values.
-If a value is not explicitly stated, return null and note the uncertainty.
+CRITICAL NULL POLICY:
+- If a value is not explicitly stated on the page, the "value" field MUST be JSON null (or omitted).
+- NEVER put sentences like "not printed on policy", "unknown", "null", or explanations inside any "value" field!
+- Put explanations, quotes, and reasoning exclusively inside the "uncertainty" field.
+
+For fuel type:
+- If the fuel type (e.g. 'Petrol', 'Diesel', 'CNG', 'Electric') is explicitly printed anywhere on the pages, extract that word (e.g. 'CNG' or 'Petrol').
+- If no fuel type word is printed anywhere on the document, set value to null and uncertainty to "Fuel type not printed on policy".
+
+For previousInsurer:
+- Search all proposal and schedule pages (look for "Previous Insurer", "Full Name of previous insurer", "Previous Policy Details", "Transcript of Proposal").
+- Extract the exact insurer name if found, with its page number.
+- If not stated anywhere, set value to null.
+
+For businessType:
+- If previousInsurer is null, set value to "unknown".
+- If previousInsurer is the same insurer as the current policy, set value to "renewal".
+- If previousInsurer is a different insurer, set value to "rollover".
+
 For numbers (CC, NCB percent, premiums, age), extract pure numeric values.
 Premium fields must be numeric: basicOd, ncbDiscount, netOd, basicTp, netTp, taxes, total.
-If registration date is present, extract registrationYear as an integer.
-For geography, extract the exact printed RTO code (e.g. 'UP-16', 'DL-9C', 'HR-26') and the exact printed location/address text.
+If registration date or manufacturing date is present, extract registrationYear/manufactureYear as an integer.
+For geography, extract the exact printed RTO code (e.g. 'UP-16', 'DL 9C', 'HR-26') and the exact printed location/address text.
 """
 
 EXTRACTION_SCHEMA = {
@@ -160,26 +178,29 @@ class GeminiFactExtractor(FactExtractor):
             
         client = genai.Client(api_key=self.api_key)
         
-        # Prepare page images at 100 DPI (crisp, compact payload for fast processing)
+        # Prepare page images at 150 DPI across all pages (up to 30 pages)
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         page_parts = []
         
-        # Extract schedule pages (up to first 3 pages and last page)
-        pages_to_extract = set()
-        for i in range(min(3, len(doc))):
-            pages_to_extract.add(i)
-        if len(doc) > 3:
-            pages_to_extract.add(len(doc) - 1)
+        total_pages = len(doc)
+        if total_pages > 30:
+            raise ValueError(
+                f"Policy document exceeds maximum supported limit of 30 pages (received {total_pages} pages). "
+                f"To maintain deterministic compliance, documents over 30 pages cannot be processed in a single run without batch splitting."
+            )
             
-        for page_idx in sorted(pages_to_extract):
-            pix = doc[page_idx].get_pixmap(dpi=100)
-            img_bytes = pix.tobytes("jpeg") # JPEG is significantly smaller and faster to send over TLS
+        pages_to_extract = list(range(total_pages))
+        logger.info(f"Extracting facts for {file_name}: rendering {total_pages} pages at 150 DPI for Gemini extraction.")
+        
+        for page_idx in pages_to_extract:
+            pix = doc[page_idx].get_pixmap(dpi=150)
+            img_bytes = pix.tobytes("jpeg")
             page_parts.append(types.Part.from_bytes(
                 data=img_bytes,
                 mime_type="image/jpeg"
             ))
             
-        prompt = f"Analyze this motor policy document ({file_name}, total {len(doc)} pages). Extract all rating facts following the schema strictly."
+        prompt = f"Analyze this entire motor policy document ({file_name}, total {total_pages} pages). Pages are 1-indexed (Page 1 through {total_pages}). Extract all rating facts following the schema strictly. Remember: if a field is not stated, value must be null."
         contents = [prompt] + page_parts
         
         # Call API with progressive backoff and fallback model if 503 spike occurs
@@ -203,32 +224,45 @@ class GeminiFactExtractor(FactExtractor):
                     raw_response_text = response.text
                     data = json.loads(raw_response_text)
                     
-                    # Derive vehicleAgeYears
-                    reg_year = data.get("registrationYear", {}).get("value")
-                    start_date = data.get("policyStartDate", {}).get("value", "")
-                    age_val = None
-                    if reg_year and start_date and len(start_date) >= 4:
-                        try:
-                            pol_yr = int(start_date[:4])
-                            age_val = max(0, pol_yr - int(reg_year))
-                        except Exception:
-                            pass
-                    elif reg_year:
-                        age_val = max(0, 2026 - int(reg_year))
+                    # Clean any accidental textual null strings like "not printed on policy", ":null", "null" to real JSON None
+                    for key in ["insurer", "previousInsurer", "fuel", "make", "model", "rto", "printedLocation", "engineCc", "registrationYear", "policyStartDate"]:
+                        if key in data and isinstance(data[key], dict):
+                            val = data[key].get("value")
+                            if isinstance(val, str) and (val.strip().lower() in ("null", ":null", "none", "unknown", "n/a", "not applicable") or "not printed" in val.lower()):
+                                if not data[key].get("uncertainty"):
+                                    data[key]["uncertainty"] = val
+                                data[key]["value"] = None
+                                data[key]["lowConfidence"] = True
+                    
+                    # Derive vehicleAgeYears using age_helper
+                    from backend.app.resolver.age_helper import calculate_vehicle_age
+                    reg_year = data.get("registrationYear", {}).get("value") if data.get("registrationYear") else None
+                    start_date = data.get("policyStartDate", {}).get("value", "") if data.get("policyStartDate") else None
+                    age_val, age_expl = calculate_vehicle_age(start_date, reg_year)
                         
                     data["vehicleAgeYears"] = {
                         "value": age_val,
-                        "page": data.get("registrationYear", {}).get("page"),
-                        "confidence": 0.95
+                        "page": data.get("registrationYear", {}).get("page") if data.get("registrationYear") else None,
+                        "confidence": 0.95,
+                        "uncertainty": age_expl
                     }
                     
-                    # Cross-check business type: insurer vs previous insurer
-                    curr_ins = (data.get("insurer", {}).get("value") or "").upper()
-                    prev_ins = (data.get("previousInsurer", {}).get("value") or "").upper()
-                    if curr_ins and prev_ins and any(w in curr_ins for w in prev_ins.split() if len(w) > 3):
-                        data["businessType"]["value"] = "renewal"
-                    elif prev_ins and not any(w in curr_ins for w in prev_ins.split() if len(w) > 3):
-                        data["businessType"]["value"] = "rollover"
+                    # Business Type Rule (ITEM 4):
+                    # If previousInsurer is null / missing / 'null', businessType = 'unknown', never rollover
+                    prev_ins_obj = data.get("previousInsurer", {})
+                    prev_ins_val = prev_ins_obj.get("value") if isinstance(prev_ins_obj, dict) else None
+                    if not prev_ins_val or not str(prev_ins_val).strip() or str(prev_ins_val).lower() in ("null", "none", "not available", "unknown", "n/a"):
+                        if "businessType" not in data or not data["businessType"]:
+                            data["businessType"] = {}
+                        data["businessType"]["value"] = "unknown"
+                        data["businessType"]["uncertainty"] = "Previous insurer is null or not printed; business type set to unknown"
+                    else:
+                        curr_ins = (data.get("insurer", {}).get("value") or "").upper()
+                        prev_ins = str(prev_ins_val).upper()
+                        if any(w in curr_ins for w in prev_ins.split() if len(w) > 3):
+                            data["businessType"]["value"] = "renewal"
+                        else:
+                            data["businessType"]["value"] = "rollover"
                         
                     facts_obj = PolicyFacts(**data)
                     

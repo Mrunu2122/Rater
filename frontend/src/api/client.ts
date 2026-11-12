@@ -10,7 +10,7 @@ export interface Citation {
 export interface RateComponent {
   applicable: boolean;
   ratePercent: number | null;
-  state: 'resolved' | 'unsupported' | 'ambiguous' | 'not_applicable';
+  state: 'resolved' | 'unsupported' | 'ambiguous' | 'not_applicable' | 'not_published';
   reason: string;
   citations: Citation[];
 }

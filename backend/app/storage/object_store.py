@@ -1,5 +1,6 @@
 import os
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from backend.app.config import settings
 
@@ -10,12 +11,18 @@ class ObjectStore:
         self.is_s3 = False
         
         if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY and settings.S3_BUCKET_NAME:
+            # Supabase Storage S3-compatible endpoints require signature_version='s3v4'
+            # and path-style addressing (s3_force_path_style=True)
             self.client = boto3.client(
                 "s3",
                 endpoint_url=settings.S3_ENDPOINT_URL if settings.S3_ENDPOINT_URL else None,
                 aws_access_key_id=settings.S3_ACCESS_KEY,
                 aws_secret_access_key=settings.S3_SECRET_KEY,
-                region_name=settings.S3_REGION
+                region_name=settings.S3_REGION,
+                config=Config(
+                    signature_version="s3v4",
+                    s3={"addressing_style": "path"}
+                )
             )
             self.is_s3 = True
         elif settings.APP_ENV == "production":

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy import select, update
 from backend.app.config import settings
-from backend.app.storage.db import init_db_sync, AsyncSessionLocal
+from backend.app.storage.db import init_db_sync, init_db_async, AsyncSessionLocal
 from backend.app.storage.models import RunModel
 from backend.app.api.runs import router as runs_router, run_background_analysis
 from backend.app.api.meta import router as meta_router
@@ -18,7 +18,11 @@ logger = logging.getLogger("rater")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. Initialize schema
-    init_db_sync()
+    try:
+        await init_db_async()
+    except Exception as e:
+        logger.warning(f"init_db_async failed: {e}. Attempting init_db_sync fallback.")
+        init_db_sync()
     logger.info("Database initialized.")
     
     # 2. Startup recovery: Find any stuck runs in transient state and recover or re-queue them

@@ -26,7 +26,60 @@ class AnalysisService:
         existing = res.scalar_one_or_none()
         
         if existing:
-            # If already processed or exists, create duplicate run with is_duplicate=True
+            # Check if grid checksum or resolver version has changed since existing run
+            current_resolver_version = "1.0.0"
+            needs_re_resolution = False
+            
+            # Identify insurer grid
+            facts_dict = existing.facts or {}
+            ins_val = (facts_dict.get("insurer", {}).get("value") or "").lower()
+            target_grid_id = None
+            if "hdfc" in ins_val:
+                target_grid_id = "hdfc_ergo"
+            elif "digit" in ins_val:
+                target_grid_id = "godigit"
+            elif "reliance" in ins_val:
+                target_grid_id = "reliance"
+            elif "tata" in ins_val:
+                target_grid_id = "tata_aig"
+                
+            grid = registry.get_grid(target_grid_id) if target_grid_id else None
+            current_checksum = grid.checksumSha256 if grid else None
+            
+            if (
+                existing.resolver_version != current_resolver_version
+                or (current_checksum and existing.grid_checksum_sha256 != current_checksum)
+            ):
+                needs_re_resolution = True
+
+            if needs_re_resolution and grid and existing.facts:
+                try:
+                    facts_obj = PolicyFacts(**existing.facts)
+                    resolution = resolve_policy(facts_obj, grid)
+                    dup_run = RunModel(
+                        file_name=file_name,
+                        file_size_bytes=len(pdf_bytes),
+                        pdf_sha256=pdf_sha256,
+                        pdf_storage_path=existing.pdf_storage_path,
+                        status=resolution.status.value,
+                        completed_at=datetime.utcnow(),
+                        grid_checksum_sha256=resolution.appliedGridChecksum,
+                        resolver_version=resolution.resolverVersion,
+                        model_id=existing.model_id,
+                        raw_extraction_json=existing.raw_extraction_json,
+                        facts=existing.facts,
+                        rates={k: v.model_dump() for k, v in resolution.rates.items()},
+                        confidence=resolution.confidence,
+                        trace=[t.model_dump() for t in resolution.trace],
+                        is_duplicate=True
+                    )
+                    session.add(dup_run)
+                    await session.commit()
+                    await session.refresh(dup_run)
+                    return dup_run
+                except Exception as ex:
+                    logger.warning(f"Re-resolution failed for duplicate {file_name}: {ex}")
+
             dup_run = RunModel(
                 file_name=file_name,
                 file_size_bytes=len(pdf_bytes),
@@ -112,7 +165,8 @@ class AnalysisService:
             # 4. Deterministic Resolution
             resolution = resolve_policy(facts, grid)
             
-            run.status = "saved"
+            # Store the resolved run status: one of resolved, unsupported, ambiguous
+            run.status = resolution.status.value
             run.grid_checksum_sha256 = resolution.appliedGridChecksum
             run.resolver_version = resolution.resolverVersion
             run.rates = {k: v.model_dump() for k, v in resolution.rates.items()}

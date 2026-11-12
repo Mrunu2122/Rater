@@ -1,51 +1,89 @@
-# Deployment Guide for Rater
+# Production Deployment Guide: Supabase + Render
 
-This guide provides click-by-click instructions to deploy Rater into production using **Supabase** (PostgreSQL + S3-compatible Storage) and **Render** (Docker Web Service).
-
----
-
-## Step 1: Set Up Supabase (Database & Object Storage)
-
-1. Sign in to [Supabase](https://supabase.com/).
-2. Create a new project named `rater-db`. Choose a strong database password.
-3. Under **Project Settings -> Database**:
-   * Copy the **Connection String** (URI mode, `postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`).
-   * Set `DATABASE_URL=postgresql+asyncpg://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
-   * Set `DATABASE_URL_SYNC=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
-4. Under **Storage**:
-   * Create a new bucket named `policies`. Set it to **Private**.
-5. Under **Project Settings -> Storage -> S3 Credentials**:
-   * Generate an **S3 Access Key** and **Secret Key**.
-   * Note the S3 endpoint URL (e.g. `https://[ref].supabase.co/storage/v1/s3`).
+This guide outlines step-by-step instructions for deploying the **Vaatun Insurance Rater Agent** to production with PostgreSQL persistence and S3 object storage.
 
 ---
 
-## Step 2: Deploy Web Service to Render
-
-1. Sign in to [Render](https://render.com/).
-2. Click **New + -> Web Service**.
-3. Connect your GitHub repository containing the `rater` code.
-4. Select **Docker** environment. Render will automatically detect `backend/Dockerfile`.
-5. Set the following **Environment Variables**:
-   * `ENVIRONMENT`: `production`
-   * `PORT`: `8000`
-   * `GEMINI_API_KEY`: Your Google AI Studio API key (`AIza...`)
-   * `GEMINI_MODEL`: `gemini-3.5-flash`
-   * `DATABASE_URL`: Your Supabase async connection string (`postgresql+asyncpg://...`)
-   * `DATABASE_URL_SYNC`: Your Supabase sync connection string (`postgresql://...`)
-   * `S3_ENDPOINT_URL`: Your Supabase Storage S3 endpoint URL (`https://[ref].supabase.co/storage/v1/s3`)
-   * `S3_ACCESS_KEY`: Your Supabase S3 Access Key ID
-   * `S3_SECRET_KEY`: Your Supabase S3 Secret Access Key
-   * `S3_BUCKET_NAME`: `policies`
-   * `S3_REGION`: `us-east-1` (or your project's region)
-6. Click **Create Web Service**. Render will build the multi-stage Docker container (compiling React frontend and launching FastAPI + Tesseract) and assign a public URL (e.g. `https://rater-app.onrender.com`).
+## 1. Prerequisites
+- A **Render.com** account
+- A **Supabase.com** account (or AWS account for Postgres & S3)
+- A **Google AI Studio** Gemini API Key
 
 ---
 
-## Step 3: Verification on Live URL
+## 2. Supabase Setup (Postgres + S3-Compatible Storage)
 
-1. Open `https://your-app.onrender.com/api/health` to confirm database, storage, and all 4 grids are loaded.
-2. In the browser, upload a motor policy PDF that is **NOT** part of the 4 samples.
-3. Verify that the run resolves with full trace and cell/page citations.
-4. Refresh the page and open the **History** tab to verify that the run persists across browser reloads.
-5. In Render dashboard, trigger a manual deploy / restart and confirm that the run history remains completely intact.
+### Step 1: Create a PostgreSQL Database
+1. Create a new project in Supabase.
+2. In **Project Settings** > **Database**, locate your connection string (URI mode):
+   ```text
+   postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+3. Set `DATABASE_URL` with the async driver:
+   ```text
+   postgresql+asyncpg://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+   ```
+
+### Step 2: Create Storage Bucket
+1. Go to **Storage** > **New Bucket**.
+2. Name the bucket `policies`.
+3. Set access to **Private** (authenticated via S3 credentials).
+
+### Step 3: Generate S3 Credentials
+1. Go to **Project Settings** > **Storage** > **S3 Access Keys**.
+2. Click **Create new access key**.
+3. Copy:
+   - `S3_ENDPOINT_URL`: `https://[REF].supabase.co/storage/v1/s3`
+   - `S3_ACCESS_KEY`: Access Key ID
+   - `S3_SECRET_KEY`: Secret Access Key
+   - `S3_BUCKET_NAME`: `policies`
+
+---
+
+## 3. Render Deployment
+
+### Step 1: Deploy with Web Service
+1. Connect your GitHub repository to Render.
+2. Select **Web Service** > **Build and deploy from a Dockerfile**.
+3. Choose plan (`Starter` or higher recommended for 512MB+ RAM).
+
+### Step 2: Configure Environment Variables
+Set the following environment variables in Render:
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `APP_ENV` | Must be `production` | `production` |
+| `GEMINI_API_KEY` | Google AI Studio Key | `your_gemini_api_key_here` |
+| `GEMINI_MODEL` | Default extraction model | `gemini-3.5-flash` |
+| `DATABASE_URL` | Async PostgreSQL URL | `postgresql+asyncpg://postgres:...` |
+| `DATABASE_URL_SYNC` | Sync PostgreSQL URL for migrations | `postgresql://postgres:...` |
+| `S3_ENDPOINT_URL` | Supabase / AWS S3 Endpoint | `https://[REF].supabase.co/storage/v1/s3` |
+| `S3_ACCESS_KEY` | S3 Access Key ID | `[KEY_ID]` |
+| `S3_SECRET_KEY` | S3 Secret Access Key | `[SECRET]` |
+| `S3_BUCKET_NAME` | Storage Bucket Name | `policies` |
+| `S3_REGION` | S3 Region | `us-east-1` |
+
+### Step 3: Health Verification
+Once deployed, check:
+```bash
+curl https://your-service.onrender.com/api/health
+```
+Expected response:
+```json
+{
+  "status": "healthy",
+  "app_env": "production",
+  "database": {
+    "backend": "postgresql",
+    "url_configured": true
+  },
+  "storage": {
+    "backend": "s3",
+    "bucket": "policies"
+  },
+  "gemini": {
+    "model": "gemini-3.5-flash",
+    "api_key_configured": true
+  }
+}
+```

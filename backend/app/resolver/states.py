@@ -7,6 +7,7 @@ class ComponentState(str, Enum):
     UNSUPPORTED = "unsupported"
     AMBIGUOUS = "ambiguous"
     NOT_APPLICABLE = "not_applicable"
+    NOT_PUBLISHED = "not_published"
 
 class RunStatus(str, Enum):
     RESOLVED = "resolved"

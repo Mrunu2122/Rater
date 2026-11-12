@@ -1,20 +1,19 @@
 services:
   - type: web
-    name: rater-app
+    name: vaatun-rater-agent
     env: docker
-    dockerfilePath: backend/Dockerfile
     plan: starter
     region: oregon
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/health
     envVars:
-      - key: ENVIRONMENT
+      - key: APP_ENV
         value: production
       - key: GEMINI_MODEL
         value: gemini-3.5-flash
       - key: GEMINI_API_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_URL_SYNC
         sync: false
       - key: S3_ENDPOINT_URL
         sync: false
@@ -25,4 +24,4 @@ services:
       - key: S3_BUCKET_NAME
         sync: false
       - key: S3_REGION
-        value: auto
+        value: us-east-1
