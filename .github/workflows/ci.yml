@@ -33,7 +33,7 @@ jobs:
     - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install openpyxl pdfplumber pymupdf pytesseract pydantic pydantic-settings sqlalchemy aiosqlite httpx pytest google-genai boto3
+        pip install openpyxl pdfplumber pymupdf pytesseract pydantic pydantic-settings "sqlalchemy[asyncio]" greenlet aiosqlite httpx pytest google-genai boto3
 
     - name: Verify Starter Bundle Checksums
       run: python scripts/verify_checksums.py
