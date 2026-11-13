@@ -34,7 +34,7 @@ export const AnalyzePage: React.FC<AnalyzePageProps> = ({ onRunSelected }) => {
             setActiveUploadStatus('Extracting policy facts via Gemini...');
           } else if (detail.status === 'resolving') {
             setActiveUploadStatus('Matching insurer rater grid & resolving commissions...');
-          } else if (detail.status === 'saved' || detail.status === 'unsupported' || detail.status === 'ambiguous') {
+          } else if (detail.status === 'resolved' || detail.status === 'saved' || detail.status === 'unsupported' || detail.status === 'ambiguous') {
             clearInterval(pollInterval);
             setIsUploading(false);
             onRunSelected(res.id);
