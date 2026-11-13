@@ -27,6 +27,8 @@ htmlcov/
 rater_storage/
 data/storage/
 data/rater.db
+cloudflared.exe
+*.exe
 *.png
 *.jpg
 *.jpeg
