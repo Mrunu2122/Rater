@@ -19,9 +19,28 @@ class GridRegistry:
                     break
         self.raters_dir = raters_dir
         self.grids: Dict[str, NormalizedGrid] = {}
+        self.cache_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "cache")
         self.load_all()
         
     def load_all(self):
+        # 1. Try fast binary cache first (sub-second load for Vercel / serverless)
+        if os.path.exists(self.cache_dir):
+            import pickle
+            cache_keys = ["godigit", "reliance", "tata_aig", "hdfc_ergo"]
+            all_cached = True
+            for k in cache_keys:
+                cache_file = os.path.join(self.cache_dir, f"{k}.pkl")
+                if os.path.exists(cache_file):
+                    try:
+                        with open(cache_file, "rb") as f:
+                            self.grids[k] = pickle.load(f)
+                    except Exception:
+                        all_cached = False
+                else:
+                    all_cached = False
+            if all_cached and len(self.grids) == 4:
+                return
+
         if not self.raters_dir or not os.path.exists(self.raters_dir):
             return
             
