@@ -48,7 +48,7 @@ else:
         sync_engine = create_engine(sync_db_url or db_url.replace("+aiosqlite", ""), echo=False)
     else:
         # Dev local SQLite
-        default_db = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
+        default_db = "/tmp/rater.db" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
         sqlite_path = os.environ.get("RATER_SQLITE_PATH", default_db)
         dir_name = os.path.dirname(sqlite_path)
         if dir_name and not os.environ.get("PYTEST_CURRENT_TEST"):

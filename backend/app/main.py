@@ -23,22 +23,28 @@ async def lifespan(app: FastAPI):
         await init_db_async()
     except Exception as e:
         logger.warning(f"init_db_async failed: {e}. Attempting init_db_sync fallback.")
-        init_db_sync()
+        try:
+            init_db_sync()
+        except Exception as e2:
+            logger.warning(f"init_db_sync fallback failed: {e2}")
     logger.info("Database initialized.")
     
     # 2. Startup recovery: Find any stuck runs in transient state and recover or re-queue them
-    async with AsyncSessionLocal() as session:
-        stmt = (
-            update(RunModel)
-            .where(RunModel.status.in_(["extracting", "resolving"]))
-            .values(
-                status="failed",
-                error_message="Analysis was interrupted by server restart. Please click Re-run."
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                update(RunModel)
+                .where(RunModel.status.in_(["extracting", "resolving"]))
+                .values(
+                    status="failed",
+                    error_message="Analysis was interrupted by server restart. Please click Re-run."
+                )
             )
-        )
-        await session.execute(stmt)
-        await session.commit()
-        logger.info("Startup recovery complete: recovered interrupted runs.")
+            await session.execute(stmt)
+            await session.commit()
+            logger.info("Startup recovery complete: recovered interrupted runs.")
+    except Exception as e:
+        logger.warning(f"Startup recovery skipped: {e}")
         
     yield
 
