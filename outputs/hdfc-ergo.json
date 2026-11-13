@@ -132,7 +132,7 @@
     "tp": {
       "applicable": true,
       "ratePercent": null,
-      "state": "unsupported",
+      "state": "not_published",
       "reason": "TP commission is not published in this schedule (Own Damage only)",
       "citations": [
         {
@@ -175,7 +175,5 @@
       "gridCitation": "Page 1 Table 2 Row 5 Col 3",
       "explanation": "Matched Zone 2, Package, Non-Petrol, NCB in slab '<10k'. Base rate is 15.0%. [ASSUMPTION: Single-policy Net OD \u20b98,053.00 applied for slab achievement; volume GWP caveat noted]."
     }
-  ],
-  "appliedGridChecksum": "d0900bf67631151ac5a9b398402279a56e5bc75a13659de6f294a3b298712bf9",
-  "resolverVersion": "1.0.0"
+  ]
 }

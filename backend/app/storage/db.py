@@ -6,6 +6,8 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.config import settings
 from backend.app.storage.models import Base
 
+from sqlalchemy.pool import NullPool
+
 logger = logging.getLogger("rater.db")
 
 db_url = settings.DATABASE_URL
@@ -14,19 +16,39 @@ sync_db_url = settings.DATABASE_URL_SYNC
 if settings.APP_ENV == "production":
     if not db_url or "sqlite" in db_url:
         raise RuntimeError("Production requires a valid PostgreSQL database URL.")
-    async_engine = create_async_engine(db_url, echo=False)
-    sync_engine = create_engine(sync_db_url or db_url.replace("+asyncpg", ""), echo=False)
+    # For Supabase / PgBouncer transaction mode poolers:
+    # 1. Disable prepared statement caching (statement_cache_size=0)
+    # 2. Use NullPool to ensure connections are never held across serverless invocations
+    connect_args = {}
+    if "asyncpg" in db_url:
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+
+    async_engine = create_async_engine(
+        db_url,
+        echo=False,
+        poolclass=NullPool,
+        connect_args=connect_args
+    )
+    sync_engine = create_engine(
+        sync_db_url or db_url.replace("+asyncpg", ""),
+        echo=False,
+        poolclass=NullPool
+    )
 else:
     # Dev / Test environment: Use Postgres if provided, else use persistent SQLite
     if db_url and "postgres" in db_url:
-        async_engine = create_async_engine(db_url, echo=False)
-        sync_engine = create_engine(sync_db_url or db_url.replace("+asyncpg", ""), echo=False)
+        connect_args = {}
+        if "asyncpg" in db_url:
+            connect_args["statement_cache_size"] = 0
+        async_engine = create_async_engine(db_url, echo=False, poolclass=NullPool, connect_args=connect_args)
+        sync_engine = create_engine(sync_db_url or db_url.replace("+asyncpg", ""), echo=False, poolclass=NullPool)
     elif db_url and "sqlite" in db_url:
         async_engine = create_async_engine(db_url, echo=False)
         sync_engine = create_engine(sync_db_url or db_url.replace("+aiosqlite", ""), echo=False)
     else:
-        # In serverless environments (like Vercel AWS Lambda), the only writable directory is /tmp
-        default_db = "/tmp/rater.db" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
+        # Dev local SQLite
+        default_db = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
         sqlite_path = os.environ.get("RATER_SQLITE_PATH", default_db)
         dir_name = os.path.dirname(sqlite_path)
         if dir_name and not os.environ.get("PYTEST_CURRENT_TEST"):

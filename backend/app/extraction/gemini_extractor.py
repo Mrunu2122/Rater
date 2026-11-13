@@ -206,7 +206,7 @@ class GeminiFactExtractor(FactExtractor):
         # Call API with progressive backoff and fallback model if 503 spike occurs
         max_retries = 3
         candidate_models = [self.model]
-        for m in [settings.GEMINI_FALLBACK_MODEL, "gemini-2.5-flash", "gemini-1.5-flash"]:
+        for m in [settings.GEMINI_FALLBACK_MODEL, "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]:
             if m and m not in candidate_models:
                 candidate_models.append(m)
         

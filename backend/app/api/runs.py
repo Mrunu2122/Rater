@@ -9,8 +9,15 @@ from backend.app.storage.db import get_db, AsyncSessionLocal
 from backend.app.storage.models import RunModel
 from backend.app.storage.object_store import object_store
 from backend.app.services.analysis_service import analysis_service
+from backend.app.config import settings
+
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
+
+class CreateRunRequest(BaseModel):
+    objectKey: str
+    fileName: str
 
 async def run_background_analysis(run_id: str):
     async with AsyncSessionLocal() as session:
@@ -19,22 +26,28 @@ async def run_background_analysis(run_id: str):
 @router.post("", status_code=202)
 async def upload_policy(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    body: Optional[CreateRunRequest] = None,
     session: AsyncSession = Depends(get_db)
 ):
-    # Validate magic bytes for PDF (%PDF)
-    contents = await file.read()
-    if not contents.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="Invalid file format: must be a valid PDF document (magic bytes %PDF required).")
-    if len(contents) > 52428800: # 50 MB
-        raise HTTPException(status_code=400, detail="File too large: maximum upload size is 50 MB.")
-        
-    run = await analysis_service.create_run(session, file.filename, contents)
+    if body and body.objectKey:
+        try:
+            run = await analysis_service.create_run_from_storage(session, body.fileName, body.objectKey)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+    elif file:
+        contents = await file.read()
+        if not contents.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="Invalid file format: must be a valid PDF document (magic bytes %PDF required).")
+        if len(contents) > 52428800: # 50 MB
+            raise HTTPException(status_code=400, detail="File too large: maximum upload size is 50 MB.")
+        run = await analysis_service.create_run(session, file.filename, contents)
+    else:
+        raise HTTPException(status_code=400, detail="Either a file multipart upload or {objectKey, fileName} JSON is required.")
     
-    # In serverless environments (like Vercel), BackgroundTasks are killed immediately
-    # when the HTTP response ends. Process synchronously so the run completes and persists.
-    if run.status != "saved":
-        if os.environ.get("VERCEL"):
+    # In serverless environments (or production), process synchronously so the run completes and persists.
+    if run.status not in ("saved", "resolved", "ambiguous", "unsupported"):
+        if os.environ.get("VERCEL") or settings.APP_ENV == "production":
             await analysis_service.process_run(session, run.id)
             await session.refresh(run)
         else:
@@ -84,6 +97,8 @@ async def list_runs(
         for r in runs
     ]
 
+from datetime import datetime, timedelta
+
 @router.get("/{run_id}")
 async def get_run(run_id: str, session: AsyncSession = Depends(get_db)):
     stmt = select(RunModel).where(RunModel.id == run_id)
@@ -92,6 +107,15 @@ async def get_run(run_id: str, session: AsyncSession = Depends(get_db)):
     if not run:
         raise HTTPException(status_code=404, detail="Run not found.")
         
+    # Recovery check: If run is stuck in 'extracting' or 'resolving' for more than 5 minutes (e.g. killed Lambda), mark as failed
+    if run.status in ("extracting", "resolving", "queued"):
+        updated_time = getattr(run, "updated_at", run.created_at)
+        if datetime.utcnow() - updated_time > timedelta(minutes=5):
+            run.status = "failed"
+            run.error_message = "Analysis timed out or was interrupted. Please click Re-run."
+            run.completed_at = datetime.utcnow()
+            await session.commit()
+
     return {
         "id": run.id,
         "fileName": run.file_name,
@@ -170,5 +194,16 @@ async def rerun_analysis(
     run.status = "queued"
     run.error_message = None
     await session.commit()
-    background_tasks.add_task(run_background_analysis, run.id)
+    
+    if os.environ.get("VERCEL") or settings.APP_ENV == "production":
+        await analysis_service.process_run(session, run.id)
+        await session.refresh(run)
+    else:
+        background_tasks.add_task(run_background_analysis, run.id)
+        
+    return {
+        "id": run.id,
+        "status": run.status,
+        "message": "Re-run started."
+    }
     return {"id": run.id, "status": "queued", "message": "Re-run started."}

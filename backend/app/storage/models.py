@@ -16,6 +16,7 @@ class RunModel(Base):
     
     status = Column(String, nullable=False, default="queued", index=True) # queued, extracting, resolving, saved, failed
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, index=True)
     completed_at = Column(DateTime, nullable=True)
     
     # Engine & Audit fields

@@ -109,7 +109,47 @@ export interface RunSummary {
 }
 
 export const api = {
+  getPresignedUploadUrl: async (fileName: string): Promise<{ uploadUrl: string; objectKey: string; method: string; headers: Record<string, string> }> => {
+    const resp = await fetch('/api/uploads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Failed to get upload URL' }));
+      throw new Error(err.detail || 'Failed to get upload URL');
+    }
+    return resp.json();
+  },
+
+  createRunFromStorage: async (objectKey: string, fileName: string): Promise<{ id: string; status: string; fileName: string; isDuplicate: boolean }> => {
+    const resp = await fetch('/api/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectKey, fileName })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Failed to create run' }));
+      throw new Error(err.detail || 'Failed to create run');
+    }
+    return resp.json();
+  },
+
   uploadPolicy: async (file: File): Promise<{ id: string; status: string; fileName: string; isDuplicate: boolean }> => {
+    // If file is larger than 4 MB, use Direct-to-Storage upload to bypass Vercel 4.5 MB serverless limit
+    if (file.size > 4 * 1024 * 1024) {
+      const uploadInfo = await api.getPresignedUploadUrl(file.name);
+      const putResp = await fetch(uploadInfo.uploadUrl, {
+        method: uploadInfo.method || 'PUT',
+        headers: uploadInfo.headers || { 'Content-Type': 'application/pdf' },
+        body: file
+      });
+      if (!putResp.ok) {
+        throw new Error(`Direct upload to storage failed with status ${putResp.status}`);
+      }
+      return api.createRunFromStorage(uploadInfo.objectKey, file.name);
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     const resp = await fetch('/api/runs', { method: 'POST', body: formData });

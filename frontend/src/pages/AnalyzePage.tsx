@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { UploadCloud, FileText, Play, CheckCircle2, AlertCircle } from 'lucide-react';
-import { PDFDocument } from 'pdf-lib';
 import { api, RunSummary } from '../api/client';
 
 interface AnalyzePageProps {
@@ -13,36 +12,6 @@ export const AnalyzePage: React.FC<AnalyzePageProps> = ({ onRunSelected }) => {
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const [activeUploadStatus, setActiveUploadStatus] = useState<string>('idle');
 
-  const optimizePolicyPdfIfNeeded = async (file: File): Promise<File> => {
-    // Vercel serverless request body limit is 4.5 MB.
-    // If the PDF is larger than 4 MB or has more than 5 pages (e.g. 15-page scanned Reliance terms & conditions),
-    // extract the primary policy schedule & proposal pages (pages 1-5) which contain 100% of rating facts.
-    if (file.size <= 4 * 1024 * 1024) {
-      return file;
-    }
-
-    try {
-      setActiveUploadStatus('Optimizing policy schedule for upload...');
-      const arrayBuffer = await file.arrayBuffer();
-      const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-      const totalPages = srcDoc.getPageCount();
-
-      // If document is large, keep first 5 pages (where policy schedule, premium table & proposal reside)
-      const pagesToKeep = Math.min(5, totalPages);
-      const newDoc = await PDFDocument.create();
-      const pageIndices = Array.from({ length: pagesToKeep }, (_, i) => i);
-      const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
-      copiedPages.forEach((page) => newDoc.addPage(page));
-
-      const pdfBytes = await newDoc.save();
-      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-      return new File([blob], file.name, { type: 'application/pdf' });
-    } catch (e) {
-      console.warn('PDF optimization skipped, uploading original file:', e);
-      return file;
-    }
-  };
-
   const handleFileUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setError('Please upload a valid PDF policy document.');
@@ -50,12 +19,10 @@ export const AnalyzePage: React.FC<AnalyzePageProps> = ({ onRunSelected }) => {
     }
     setError(null);
     setIsUploading(true);
-    setActiveUploadStatus('Preparing policy document...');
+    setActiveUploadStatus(file.size > 4 * 1024 * 1024 ? 'Uploading directly to secure storage (bypassing 4.5 MB limit)...' : 'Uploading PDF document...');
 
     try {
-      const fileToUpload = await optimizePolicyPdfIfNeeded(file);
-      setActiveUploadStatus('Uploading PDF document...');
-      const res = await api.uploadPolicy(fileToUpload);
+      const res = await api.uploadPolicy(file);
       setActiveUploadId(res.id);
       setActiveUploadStatus('Queued for AI extraction...');
 

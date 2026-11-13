@@ -117,6 +117,59 @@ class AnalysisService:
         await session.refresh(run)
         return run
 
+    async def create_run_from_storage(self, session: AsyncSession, file_name: str, object_key: str) -> RunModel:
+        # Download PDF from object storage to inspect magic bytes, page count, and sha256
+        pdf_bytes = object_store.get_pdf(object_key)
+        if not pdf_bytes.startswith(b"%PDF"):
+            raise ValueError("Invalid file format: must be a valid PDF document (magic bytes %PDF required).")
+        
+        # Verify page count <= 30
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if len(doc) > 30:
+            raise ValueError(f"Document exceeds 30-page limit ({len(doc)} pages found). PDFs over 30 pages are rejected.")
+
+        pdf_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
+        
+        # Check duplicate
+        stmt = select(RunModel).where(RunModel.pdf_sha256 == pdf_sha256).order_by(desc(RunModel.created_at)).limit(1)
+        res = await session.execute(stmt)
+        existing = res.scalar_one_or_none()
+        if existing and existing.status in ("resolved", "saved", "ambiguous", "unsupported"):
+            dup_run = RunModel(
+                file_name=file_name,
+                file_size_bytes=len(pdf_bytes),
+                pdf_sha256=pdf_sha256,
+                pdf_storage_path=existing.pdf_storage_path,
+                status=existing.status,
+                completed_at=datetime.utcnow(),
+                grid_checksum_sha256=existing.grid_checksum_sha256,
+                resolver_version=existing.resolver_version,
+                model_id=existing.model_id,
+                raw_extraction_json=existing.raw_extraction_json,
+                facts=existing.facts,
+                rates=existing.rates,
+                confidence=existing.confidence,
+                trace=existing.trace,
+                is_duplicate=True
+            )
+            session.add(dup_run)
+            await session.commit()
+            await session.refresh(dup_run)
+            return dup_run
+
+        run = RunModel(
+            file_name=file_name,
+            file_size_bytes=len(pdf_bytes),
+            pdf_sha256=pdf_sha256,
+            pdf_storage_path=object_key,
+            status="queued"
+        )
+        session.add(run)
+        await session.commit()
+        await session.refresh(run)
+        return run
+
     async def process_run(self, session: AsyncSession, run_id: str):
         stmt = select(RunModel).where(RunModel.id == run_id)
         res = await session.execute(stmt)

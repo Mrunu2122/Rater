@@ -39,6 +39,34 @@ class ObjectStore:
             except Exception as e:
                 pass
 
+    def generate_presigned_upload_url(self, storage_key: str, expires_in: int = 900) -> dict:
+        if self.is_s3 and self.client:
+            url = self.client.generate_presigned_url(
+                ClientMethod="put_object",
+                Params={
+                    "Bucket": self.bucket,
+                    "Key": storage_key,
+                    "ContentType": "application/pdf"
+                },
+                ExpiresIn=expires_in
+            )
+            return {
+                "uploadUrl": url,
+                "objectKey": storage_key,
+                "method": "PUT",
+                "headers": {"Content-Type": "application/pdf"}
+            }
+        elif settings.APP_ENV == "production":
+            raise RuntimeError("Cannot generate presigned upload URL: S3 object store not configured in production mode.")
+        else:
+            # Dev fallback: route upload through /api/uploads/direct
+            return {
+                "uploadUrl": f"/api/uploads/direct?key={storage_key}",
+                "objectKey": storage_key,
+                "method": "PUT",
+                "headers": {"Content-Type": "application/pdf"}
+            }
+
     def upload_pdf(self, storage_key: str, data: bytes) -> str:
         if self.is_s3 and self.client:
             self.client.put_object(

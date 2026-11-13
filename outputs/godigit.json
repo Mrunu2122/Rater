@@ -63,7 +63,7 @@
       "lowConfidence": false
     },
     "printedLocation": {
-      "value": "Kanpur Nagar, UTTAR PRADESH",
+      "value": "Kanpur Nagar,UTTAR PRADESH",
       "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
@@ -83,13 +83,7 @@
       "uncertainty": null,
       "lowConfidence": false
     },
-    "manufactureYear": {
-      "value": null,
-      "page": 1,
-      "confidence": 1.0,
-      "uncertainty": "0001-01-01 unpopulated",
-      "lowConfidence": true
-    },
+    "manufactureYear": null,
     "vehicleAgeYears": {
       "value": 7,
       "page": 1,
@@ -105,12 +99,12 @@
       "lowConfidence": false
     },
     "premiums": {
-      "basicOd": null,
+      "basicOd": 0.0,
       "ncbDiscount": null,
-      "netOd": null,
+      "netOd": 0.0,
       "basicTp": 3416.0,
       "netTp": 3466.0,
-      "taxes": 623.88,
+      "taxes": null,
       "total": 4089.88,
       "page": 2,
       "confidence": 1.0,
@@ -161,7 +155,7 @@
     {
       "step": 3,
       "decision": "Resolved geography key: UP_Bad",
-      "policyCitation": "Policy printed location: 'KANPUR NAGAR, UTTAR PRADESH' / RTO: 'UP-78'",
+      "policyCitation": "Policy printed location: 'KANPUR NAGAR,UTTAR PRADESH' / RTO: 'UP-78'",
       "gridCitation": "4W  RTO!B1609:F1609",
       "explanation": "In-grid table mapped RTO 'UP-78' to 4WTP cluster 'UP_Bad'."
     },
@@ -172,7 +166,5 @@
       "gridCitation": "4W SATP!B293:E293",
       "explanation": "Exact match on Row GODIGIT_SATP_R293: cluster 'UP_Bad', Petrol > 1000 cc, Age 7 years (Age: All). Max CD2 = 29.5%."
     }
-  ],
-  "appliedGridChecksum": "6efb7ca43e7dae72339601e4daebef015f0b486cde0cbb5a0f6524356e3ac034",
-  "resolverVersion": "1.0.0"
+  ]
 }

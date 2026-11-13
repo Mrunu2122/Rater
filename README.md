@@ -41,21 +41,25 @@ The system extracts parameters from motor policy schedules using Google Gemini, 
 
 ## 2. Storage, Durability & Persistence
 
-- **Production Mode (`APP_ENV=production`):**
-  - Requires **PostgreSQL** (`DATABASE_URL`) and **S3** object storage credentials (`S3_BUCKET_NAME`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`).
-  - The application strictly refuses to start on SQLite or local disk in production mode.
+- **Production Mode (`APP_ENV=production` on Vercel / Supabase):**
+  - Persistence is powered by **PostgreSQL** (`DATABASE_URL=postgresql+asyncpg://...`) using Supabase's transaction pooler with `NullPool` and `statement_cache_size=0` to ensure no connection leakage across serverless invocations.
+  - Policy PDFs are stored in private **S3-compatible Object Storage** (`S3_BUCKET_NAME`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`).
+  - Production guard (`backend/app/config.py`) strictly enforces PostgreSQL and S3 configuration at startup; SQLite, `/tmp`, and local disk are completely disallowed in production.
+  - All run states (`queued`, `extracting`, `resolving`, `saved`, `failed`) and timestamps (`created_at`, `updated_at`, `completed_at`) are written directly to PostgreSQL, surviving container recycling, serverless restarts, and redeployments.
+  - Stale in-progress runs from aborted serverless executions are detected via `updated_at` timeout and can be recovered via `POST /api/runs/:id/rerun`.
+- **Large Upload Architecture (Bypassing Vercel 4.5 MB Limit):**
+  - Files over 4 MB bypass Vercel's 4.5 MB payload cap via Direct-to-Storage presigned URLs (`POST /api/uploads` -> browser `PUT` straight to S3/Supabase Storage -> `POST /api/runs` with `{ objectKey, fileName }`).
+  - All pages of the policy are preserved and analyzed (no client-side page dropping).
+  - Documents exceeding the 30-page ceiling are rejected server-side with a clear descriptive error.
+  - *Supabase Storage CORS requirement:* The storage bucket must have CORS enabled for `GET, PUT, POST, HEAD` from your application domain.
 - **Development Mode (`APP_ENV=dev`):**
-  - Uses SQLite (`data/rater.db`) and local disk storage (`data/storage/`).
-- **Persistence Across Restarts:**
-  - Policy PDFs are hashed via SHA-256 and stored in the object store.
-  - All run states (`extracting`, `resolving`, `saved`, `failed`) are tracked in the database.
-  - On application startup, a recovery hook recovers interrupted transient runs.
+  - Uses local SQLite and disk storage for offline testing and fast local CI runs.
 
 ---
 
 ## 3. Gemini API Processing Notice
-- Uploaded policy PDFs are ingested as 100 DPI page images and sent to Google Gemini (`gemini-3.5-flash`) for multi-page visual extraction.
-- The Gemini API key is managed exclusively on the backend (`rater/.env` / environment) and is never exposed to the frontend.
+- Uploaded policy PDFs are rendered at 150 DPI page images and sent to Google Gemini (`gemini-3.5-flash`, with `gemini-3.1-flash-lite`, `gemini-2.5-flash`, and `gemini-1.5-flash` fallbacks for 503 high-demand resilience) for multi-page visual extraction.
+- The Gemini API key is managed exclusively on the backend and is never exposed to the client.
 
 ---
 

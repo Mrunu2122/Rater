@@ -11,6 +11,7 @@ from backend.app.storage.db import init_db_sync, init_db_async, AsyncSessionLoca
 from backend.app.storage.models import RunModel
 from backend.app.api.runs import router as runs_router, run_background_analysis
 from backend.app.api.meta import router as meta_router
+from backend.app.api.uploads import router as uploads_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rater")
@@ -53,6 +54,7 @@ app.add_middleware(
 
 app.include_router(runs_router)
 app.include_router(meta_router)
+app.include_router(uploads_router)
 
 # Mount frontend static files if built
 frontend_dist = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

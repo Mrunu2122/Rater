@@ -7,22 +7,22 @@
   },
   "facts": {
     "insurer": {
-      "value": "TATA AIG GENERAL INSURANCE COMPANY LIMITED",
+      "value": "Tata AIG General Insurance Company Limited",
       "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "previousInsurer": {
-      "value": "TATA AIG GENERAL INSURANCE CO.LTD.",
-      "page": 11,
+      "value": "ICICI Lombard General Insurance Co. Ltd.",
+      "page": 2,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "businessType": {
-      "value": "renewal",
-      "page": 11,
+      "value": "rollover",
+      "page": 2,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
@@ -35,35 +35,35 @@
       "lowConfidence": false
     },
     "make": {
-      "value": "MARUTI",
-      "page": 4,
+      "value": "MARUTI SUZUKI",
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "model": {
-      "value": "ZEN ESTILO / LXI CNG / HATCH BACK",
-      "page": 4,
+      "value": "WAGON R LXI CNG",
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "fuel": {
-      "value": "cng",
-      "page": 4,
+      "value": "CNG",
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "rto": {
-      "value": "DL 9C AB 2893",
-      "page": 4,
+      "value": "DL-1C",
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "printedLocation": {
-      "value": "New Delhi, DELHI-DELHI, 110059, DELHI, India",
+      "value": "DELHI",
       "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
@@ -71,42 +71,42 @@
     },
     "engineCc": {
       "value": 998,
-      "page": 4,
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "registrationYear": {
-      "value": 2011,
-      "page": 4,
+      "value": 2021,
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "manufactureYear": null,
     "vehicleAgeYears": {
-      "value": 15,
-      "page": 4,
+      "value": 5,
+      "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "policyStartDate": {
-      "value": "2026-04-01",
+      "value": "2026-03-01",
       "page": 1,
       "confidence": 1.0,
       "uncertainty": null,
       "lowConfidence": false
     },
     "premiums": {
-      "basicOd": null,
+      "basicOd": 0.0,
       "ncbDiscount": null,
-      "netOd": null,
+      "netOd": 0.0,
       "basicTp": 2094.0,
-      "netTp": 2154.0,
-      "taxes": 388.0,
-      "total": 2542.0,
-      "page": 5,
+      "netTp": 2094.0,
+      "taxes": null,
+      "total": 2471.0,
+      "page": 2,
       "confidence": 1.0,
       "ncbPercent": null,
       "ncbUnclearNote": null
@@ -159,28 +159,28 @@
       "decision": "Selected grid for insurer: Tata AIG General Insurance Company Limited",
       "policyCitation": "Policy p.1",
       "gridCitation": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx (SHA: c62b657e...)",
-      "explanation": "Matched policy insurer 'TATA AIG GENERAL INSURANCE COMPANY LIMITED' to grid Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx."
+      "explanation": "Matched policy insurer 'Tata AIG General Insurance Company Limited' to grid Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx."
     },
     {
       "step": 2,
       "decision": "Grid effective date caveat noted",
-      "policyCitation": "Policy start date: 2026-04-01",
+      "policyCitation": "Policy start date: 2026-03-01",
       "gridCitation": "Tata AIG Standard Grid_Communication_Mar'26_F_v2_0212.xlsx",
       "explanation": "Pvtcar Row 1 states applicable from 1st Nov'25 policies"
     },
     {
       "step": 3,
       "decision": "Resolved geography key: DELHI",
-      "policyCitation": "Policy printed location: 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' / RTO: 'DL 9C AB 2893'",
+      "policyCitation": "Policy printed location: 'DELHI' / RTO: 'DL-1C'",
       "gridCitation": "Pvtcar Col V (DELHI)",
-      "explanation": "Policy printed location text 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' matched grid column label 'DELHI' directly (Rule 7 applied with exact text match)."
+      "explanation": "Policy printed location text 'DELHI' matched grid column label 'DELHI' directly (Rule 7 applied with exact text match)."
     },
     {
       "step": 4,
-      "decision": "Inspected Tata AIG Pvtcar candidate rows for Delhi CNG SATP Renewal",
-      "policyCitation": "Policy p.1: 'NEW DELHI, DELHI-DELHI, 110059, DELHI, INDIA' matched column DELHI",
+      "decision": "Inspected Tata AIG Pvtcar candidate rows for DELHI CNG SATP rollover",
+      "policyCitation": "Policy p.1: 'DELHI' matched column DELHI",
       "gridCitation": "Pvtcar!V511:V535",
-      "explanation": "All 7 vehicle categories (Compact, MPV SUV, Mid Size, Ultra High End, Mini, High End, Quadricycle) yield an identical base COA rate: 38.0%."
+      "explanation": "Evaluated candidate rows for DELHI \u00d7 CNG \u00d7 rollover. Base COA candidate rate is 38.0%."
     },
     {
       "step": 5,
@@ -189,7 +189,5 @@
       "gridCitation": "Pvtcar!F3, General Guidelines!C5, Pvtcar!V511:V535",
       "explanation": "The grid specifies that the tabulated 38.0% rate is a base commission only, and that additional GWP-based incremental COA rules apply. Because broker portfolio GWP is not present on an individual policy, the final payable rate cannot be authoritatively determined. Output refused with proof (status: unsupported)."
     }
-  ],
-  "appliedGridChecksum": "c62b657e7d819a250cb86549c177f88ff0277835d39a2a3e0d337fdc9915f879",
-  "resolverVersion": "1.0.0"
+  ]
 }
