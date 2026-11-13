@@ -11,13 +11,9 @@ from backend.app.storage.object_store import object_store
 from backend.app.services.analysis_service import analysis_service
 from backend.app.config import settings
 
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query, Request
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
-
-class CreateRunRequest(BaseModel):
-    objectKey: str
-    fileName: str
 
 async def run_background_analysis(run_id: str):
     async with AsyncSessionLocal() as session:
@@ -25,23 +21,37 @@ async def run_background_analysis(run_id: str):
 
 @router.post("", status_code=202)
 async def upload_policy(
+    request: Request,
     background_tasks: BackgroundTasks,
-    file: Optional[UploadFile] = File(None),
-    body: Optional[CreateRunRequest] = None,
     session: AsyncSession = Depends(get_db)
 ):
-    if body and body.objectKey:
+    content_type = request.headers.get("content-type", "")
+    
+    if "application/json" in content_type:
         try:
-            run = await analysis_service.create_run_from_storage(session, body.fileName, body.objectKey)
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        object_key = body.get("objectKey")
+        file_name = body.get("fileName")
+        if not object_key or not file_name:
+            raise HTTPException(status_code=400, detail="Both objectKey and fileName are required in JSON body.")
+        try:
+            run = await analysis_service.create_run_from_storage(session, file_name, object_key)
         except ValueError as ve:
             raise HTTPException(status_code=400, detail=str(ve))
-    elif file:
-        contents = await file.read()
+            
+    elif "multipart/form-data" in content_type:
+        form = await request.form()
+        file_obj = form.get("file")
+        if not file_obj or not hasattr(file_obj, "read"):
+            raise HTTPException(status_code=400, detail="Missing 'file' field in multipart form data.")
+        contents = await file_obj.read()
         if not contents.startswith(b"%PDF"):
             raise HTTPException(status_code=400, detail="Invalid file format: must be a valid PDF document (magic bytes %PDF required).")
         if len(contents) > 52428800: # 50 MB
             raise HTTPException(status_code=400, detail="File too large: maximum upload size is 50 MB.")
-        run = await analysis_service.create_run(session, file.filename, contents)
+        run = await analysis_service.create_run(session, getattr(file_obj, "filename", "policy.pdf"), contents)
     else:
         raise HTTPException(status_code=400, detail="Either a file multipart upload or {objectKey, fileName} JSON is required.")
     
