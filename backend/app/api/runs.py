@@ -30,8 +30,14 @@ async def upload_policy(
         
     run = await analysis_service.create_run(session, file.filename, contents)
     
+    # In serverless environments (like Vercel), BackgroundTasks are killed immediately
+    # when the HTTP response ends. Process synchronously so the run completes and persists.
     if run.status != "saved":
-        background_tasks.add_task(run_background_analysis, run.id)
+        if os.environ.get("VERCEL"):
+            await analysis_service.process_run(session, run.id)
+            await session.refresh(run)
+        else:
+            background_tasks.add_task(run_background_analysis, run.id)
         
     return {
         "id": run.id,
