@@ -51,8 +51,9 @@ class ObjectStore:
         elif settings.APP_ENV == "production":
             raise RuntimeError("Cannot store PDF: S3 object store not configured in production mode.")
         else:
-            # Dev-only persistent local disk
-            local_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "storage")
+            # Dev / Serverless local disk storage (in Vercel, only /tmp is writable)
+            default_storage = "/tmp/storage" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "storage")
+            local_dir = default_storage
             os.makedirs(local_dir, exist_ok=True)
             local_path = os.path.join(local_dir, storage_key.replace("/", "_"))
             with open(local_path, "wb") as f:
@@ -66,8 +67,11 @@ class ObjectStore:
         elif settings.APP_ENV == "production":
             raise RuntimeError("Cannot retrieve PDF: S3 object store not configured in production mode.")
         else:
-            local_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "storage")
+            default_storage = "/tmp/storage" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "storage")
+            local_dir = default_storage
             local_path = os.path.join(local_dir, storage_key.replace("/", "_"))
+            if not os.path.exists(local_path) and os.path.exists(storage_key):
+                local_path = storage_key
             with open(local_path, "rb") as f:
                 return f.read()
 

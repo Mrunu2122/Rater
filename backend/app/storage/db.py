@@ -25,10 +25,9 @@ else:
         async_engine = create_async_engine(db_url, echo=False)
         sync_engine = create_engine(sync_db_url or db_url.replace("+aiosqlite", ""), echo=False)
     else:
-        sqlite_path = os.environ.get(
-            "RATER_SQLITE_PATH",
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
-        )
+        # In serverless environments (like Vercel AWS Lambda), the only writable directory is /tmp
+        default_db = "/tmp/rater.db" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "rater.db")
+        sqlite_path = os.environ.get("RATER_SQLITE_PATH", default_db)
         dir_name = os.path.dirname(sqlite_path)
         if dir_name and not os.environ.get("PYTEST_CURRENT_TEST"):
             os.makedirs(dir_name, exist_ok=True)
